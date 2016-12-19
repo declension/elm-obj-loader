@@ -2,7 +2,7 @@
     "version": "1.0.0",
     "summary": "Wavefront obj file loader for elm-community/webgl",
     "repository": "https://github.com/Zinggi/elm-obj-loader.git",
-    "license": "BSD3",
+    "license": "MIT",
     "source-directories": [
         "src"
     ],
