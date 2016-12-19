@@ -5,14 +5,26 @@ import Math.Vector2 exposing (Vec2)
 
 
 type Mesh
-    = WithoutTexture (MeshWith { pos : Vec3, norm : Vec3 })
-    | WithTexture (MeshWith { pos : Vec3, norm : Vec3, coord : Vec2 })
+    = WithoutTexture (MeshWith Vertex)
+    | WithTexture (MeshWith VertexWithTexture)
 
 
 type alias MeshWith a =
     { vertices : List a
     , indices : List Int3
     }
+
+
+type alias VertexWith a =
+    { a | pos : Vec3, norm : Vec3 }
+
+
+type alias Vertex =
+    VertexWith {}
+
+
+type alias VertexWithTexture =
+    VertexWith { coord : Vec2 }
 
 
 type

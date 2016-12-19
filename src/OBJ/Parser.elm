@@ -2,7 +2,6 @@ module OBJ.Parser exposing (..)
 
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Math.Vector2 as V2 exposing (Vec2, vec2)
-import OBJ.Assembler exposing (..)
 import Combine exposing (..)
 import Combine.Num exposing (..)
 import Combine.Char exposing (..)
@@ -126,14 +125,17 @@ fourValues tagger vtype =
     tagger <$> (vtype) <*> (spaces *> vtype) <*> (spaces *> vtype) <*> (spaces *> vtype)
 
 
+int_int : Parser s ( Int, Int )
 int_int =
     (,) <$> int <*> (string "/" *> int)
 
 
+int_int_int : Parser s ( Int, Int, Int )
 int_int_int =
     (,,) <$> int <*> (string "/" *> int) <*> (string "/" *> int)
 
 
+int__int : Parser s ( Int, Int )
 int__int =
     (,) <$> int <*> (string "//" *> int)
 
@@ -146,15 +148,6 @@ vertexNormal =
 vertexTexture : Parser s Vec2
 vertexTexture =
     regex "vt[ \t]+" *> ((ignoreZ <$> vector3) <|> vector2)
-
-
-ignoreZ : Vec3 -> Vec2
-ignoreZ v =
-    let
-        ( x, y, _ ) =
-            V3.toTuple v
-    in
-        vec2 x y
 
 
 vertex : Parser s Vec3
@@ -193,10 +186,6 @@ intWithZero =
         <$> sign
         <*> (toInt <$> regex "[0-9]*")
         <?> "expected an integer with leading zeros"
-
-
-toInt s =
-    String.toInt s |> Result.withDefault 0
 
 
 betterFloat : Parser s Float
@@ -239,3 +228,17 @@ formatError ms stream =
             ++ "\nI expected one of the following:\n"
             ++ expectationSeparator
             ++ String.join expectationSeparator ms
+
+
+toInt : String -> Int
+toInt s =
+    String.toInt s |> Result.withDefault 0
+
+
+ignoreZ : Vec3 -> Vec2
+ignoreZ v =
+    let
+        ( x, y, _ ) =
+            V3.toTuple v
+    in
+        vec2 x y

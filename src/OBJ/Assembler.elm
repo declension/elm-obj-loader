@@ -1,7 +1,7 @@
 module OBJ.Assembler exposing (..)
 
 import Array exposing (Array)
-import Dict
+import Dict exposing (Dict)
 import Math.Vector2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import OBJ.Types exposing (..)
@@ -58,6 +58,7 @@ log s a =
         a
 
 
+toMeshes : CompileState -> Dict String Mesh
 toMeshes state =
     Dict.map
         (\groupName group ->
@@ -81,11 +82,20 @@ toMeshes state =
         state.groups
 
 
+makeMeshV : Array Vec3 -> List Int3 -> MeshWith Vertex
 makeMeshV vs fs =
     makeMeshVHelper vs fs { verts = [], is = [], i = 0 }
         |> (\{ is, verts } -> { vertices = verts, indices = is })
 
 
+type alias TempMesh a =
+    { i : Int
+    , is : List Int3
+    , verts : List a
+    }
+
+
+makeMeshVHelper : Array Vec3 -> List Int3 -> TempMesh Vertex -> TempMesh Vertex
 makeMeshVHelper vs faces state =
     case faces of
         ( v1, v2, v3 ) :: fs ->
@@ -116,11 +126,26 @@ makeMeshVHelper vs faces state =
             state
 
 
+makeMeshVN : Array Vec3 -> Array Vec3 -> List ( Int2, Int2, Int2 ) -> MeshWith Vertex
 makeMeshVN vs vns fs =
     makeMeshVNHelper vs vns fs { verts = [], is = [], i = 0, knowns = Dict.empty }
         |> (\{ is, verts } -> { vertices = verts, indices = is })
 
 
+type alias TempMeshWithDict i a =
+    { i : Int
+    , is : List Int3
+    , verts : List a
+    , knowns : Dict i ( Int, a )
+    }
+
+
+makeMeshVNHelper :
+    Array Vec3
+    -> Array Vec3
+    -> List ( Int2, Int2, Int2 )
+    -> TempMeshWithDict Int2 Vertex
+    -> TempMeshWithDict Int2 Vertex
 makeMeshVNHelper vs vns faces state =
     case faces of
         ( ( v1, vn1 ), ( v2, vn2 ), ( v3, vn3 ) ) :: fs ->
@@ -140,11 +165,24 @@ makeMeshVNHelper vs vns faces state =
             state
 
 
+makeMeshVNT :
+    Array Vec3
+    -> Array Vec3
+    -> Array Vec2
+    -> List ( Int3, Int3, Int3 )
+    -> MeshWith VertexWithTexture
 makeMeshVNT vs vns vts fs =
     makeMeshVNTHelper vs vns vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
         |> (\{ is, verts } -> { vertices = verts, indices = is })
 
 
+makeMeshVNTHelper :
+    Array Vec3
+    -> Array Vec3
+    -> Array Vec2
+    -> List ( Int3, Int3, Int3 )
+    -> TempMeshWithDict Int3 VertexWithTexture
+    -> TempMeshWithDict Int3 VertexWithTexture
 makeMeshVNTHelper vs vns vts faces state =
     case faces of
         ( ( v1, vt1, vn1 ), ( v2, vt2, vn2 ), ( v3, vt3, vn3 ) ) :: fs ->
@@ -165,11 +203,30 @@ makeMeshVNTHelper vs vns vts faces state =
             state
 
 
+makeMeshVT :
+    Array Vec3
+    -> Array Vec2
+    -> List ( Int2, Int2, Int2 )
+    -> MeshWith VertexWithTexture
 makeMeshVT vs vts fs =
     makeMeshVTHelper vs vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
         |> (\{ is, verts } -> { vertices = verts, indices = is })
 
 
+type alias TempMeshVT =
+    { i : Int
+    , is : List Int3
+    , verts : List VertexWithTexture
+    , knowns : Dict Int2 ( Int, { coord : Vec2, pos : Vec3 } )
+    }
+
+
+makeMeshVTHelper :
+    Array Vec3
+    -> Array Vec2
+    -> List ( Int2, Int2, Int2 )
+    -> TempMeshVT
+    -> TempMeshVT
 makeMeshVTHelper vs vts faces state =
     case faces of
         ( ( v1, vt1 ), ( v2, vt2 ), ( v3, vt3 ) ) :: fs ->
@@ -201,6 +258,7 @@ makeMeshVTHelper vs vts faces state =
             state
 
 
+get3 : ( Int, Int, Int ) -> Array a -> Maybe ( a, a, a )
 get3 ( a, b, c ) array =
     case ( Array.get a array, Array.get b array, Array.get c array ) of
         ( Just a, Just b, Just c ) ->
@@ -333,10 +391,12 @@ getOrUpdateCoordsHelperVN vs vns coords ( state, is, verts ) =
 
 {-| (v1, v2, v3) are assumed to be given in counter clock direction
 -}
+getNormalTo : ( Vec3, Vec3, Vec3 ) -> Vec3
 getNormalTo ( v1, v2, v3 ) =
     V3.normalize (V3.cross (V3.sub v1 v2) (V3.sub v3 v2))
 
 
+addCurrentGroup : CompileState -> CompileState
 addCurrentGroup state =
     let
         _ =
@@ -353,6 +413,7 @@ addCurrentGroup state =
                 state
 
 
+compileHelper : CompileState -> List Line -> CompileState
 compileHelper state lines =
     case lines of
         [] ->
@@ -362,6 +423,7 @@ compileHelper state lines =
             compileHelper (insertLine l state) ls
 
 
+insertLine : Line -> CompileState -> CompileState
 insertLine line state =
     case line of
         Object s ->
