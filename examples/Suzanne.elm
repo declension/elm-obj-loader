@@ -1,4 +1,4 @@
-module Main exposing (..)
+module Suzanne exposing (..)
 
 import AnimationFrame
 import Dict exposing (Dict)
@@ -16,11 +16,6 @@ import WebGL.Options as GL
 import WebGL.Settings exposing (cullFace, depth, depthOptions, front)
 import OBJ
 import OBJ.Types exposing (Mesh(..))
-
-
-objFileUrl : String
-objFileUrl =
-    "suzanne.obj"
 
 
 type alias Model =
@@ -77,7 +72,7 @@ loadTexture url msg =
 
 loadModel : (Result String (Dict String Mesh) -> msg) -> Cmd msg
 loadModel msg =
-    Http.toTask (Http.getString objFileUrl)
+    Http.toTask (Http.getString "suzanne.obj")
         |> Task.andThen
             (\s ->
                 OBJ.load s
