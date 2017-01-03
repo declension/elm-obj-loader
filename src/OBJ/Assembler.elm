@@ -16,6 +16,11 @@ import OBJ.Types exposing (..)
 -- a smooth group is a dict of vertex indices and their face normal.
 -- face normals are added together.
 -- at the end, all added face normals will be normalized
+--
+--
+-- idea: when adding a face, don't add the indices, add the actuall data.
+-- then in a second step missing data can be easily added,
+-- then do the indexing based on the actual data.
 
 
 type alias CompileState =

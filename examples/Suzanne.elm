@@ -51,7 +51,7 @@ initModel =
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ loadModel LoadObj
+        [ loadModel "suzanne.obj" LoadObj
         , loadTexture "chavant.jpg" TextureLoaded
         ]
 
@@ -70,9 +70,9 @@ loadTexture url msg =
             )
 
 
-loadModel : (Result String (Dict String Mesh) -> msg) -> Cmd msg
-loadModel msg =
-    Http.toTask (Http.getString "suzanne.obj")
+loadModel : String -> (Result String (Dict String Mesh) -> msg) -> Cmd msg
+loadModel url msg =
+    Http.toTask (Http.getString url)
         |> Task.andThen
             (\s ->
                 OBJ.load s
@@ -217,6 +217,7 @@ void main()
     vec3 fragColor = vec3(0.7, 0.7, 0.7);
 
     vec3 N = normalize(vNormal);
+
     vec3 L = normalize(lightPos - vVertex);
 
     float lambertian = max(dot(N, L), 0.0);

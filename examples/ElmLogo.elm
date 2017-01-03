@@ -143,11 +143,13 @@ renderModel model textureDiff textureNorm mesh =
             getCamera model
 
         modelM =
-            M4.makeRotate 0.2 (vec3 0 1 0)
-                |> M4.translate (vec3 -1 0 0)
+            M4.makeTranslate (vec3 -1 0 0)
 
         modelView =
             M4.mul view modelM
+
+        lightPos =
+            M4.transform view (vec3 -2 (cos model.time) (sin model.time))
     in
         case mesh of
             WithTexture { vertices, indices } ->
@@ -160,6 +162,12 @@ renderModel model textureDiff textureNorm mesh =
                     , textureDiff = textureDiff
                     , textureNorm = textureNorm
                     , time = model.time
+                    , light_diffuse = vec3 1.0 1.0 1.0
+                    , light_position = lightPos
+                    , light_specular = vec3 0.15 0.15 0.15
+                    , material_diffuse = vec3 0.5 0.5 0.5
+                    , material_specular = vec3 0.15 0.15 0.15
+                    , material_shininess = 100.002
                     }
 
             _ ->
@@ -176,7 +184,7 @@ getCamera { mouseDelta, zoom, windowSize } =
             toFloat windowSize.width / toFloat windowSize.height
     in
         ( (M4.makePerspective 45 (aspect) 0.01 10000)
-        , (M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my) (zoom * cos -mx * sin my)) (vec3 0 1 0) (vec3 0 1 0))
+        , (M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my) (zoom * cos -mx * sin my)) (vec3 0 2 0) (vec3 0 1 0))
         )
 
 
@@ -236,29 +244,32 @@ getDelta curr lastP delta =
     MouseDelta (toFloat (curr.x - lastP.x) / 100 + delta.x) (clamp 0.01 pi (toFloat (curr.y - lastP.y) / 100 + delta.y))
 
 
-{-| A pretty standart phong shader.
+{-|
 -}
 vert =
     [glsl|
+
 attribute vec3 pos;
 attribute vec3 norm;
 attribute vec2 coord;
+varying vec2 Vertex_UV;
+varying vec3 Vertex_Normal;
+varying vec3 Vertex_LightDir;
+varying vec3 Vertex_EyeVec;
 
-uniform mat4 mvMat;
-uniform mat3 nMat;
 uniform mat4 camera;
-varying vec3 vVertex;
-varying vec3 vNormal;
-varying vec2 vCoord;
+uniform mat4 mvMat;
 
+uniform vec3 light_position;
 
 void main()
 {
-    vec4 pos4 = mvMat * vec4(pos, 1.0);
-    vNormal = vec3(mvMat * vec4(norm, 0.0));
-    vCoord = coord;
-    vVertex = vec3(pos4);
-    gl_Position = camera * pos4;
+    vec4 view_vertex = mvMat * vec4(pos, 1.0);
+    gl_Position = camera * view_vertex;
+    Vertex_UV = coord;
+    Vertex_Normal = (mvMat * vec4(norm, 1.0)).xyz;
+    Vertex_LightDir = light_position - view_vertex.xyz;
+    Vertex_EyeVec = -view_vertex.xyz;
 }
 
 |]
@@ -269,38 +280,76 @@ TODO: this shader is very wrong
 -}
 frag =
     [glsl|
+//__REPLACE_ME_WITH__(#extension GL_OES_standard_derivatives : enable)
+
 precision mediump float;
 
-uniform sampler2D textureDiff;
-uniform sampler2D textureNorm;
-uniform float time;
-varying vec3 vVertex;
-varying vec3 vNormal;
-varying vec2 vCoord;
+uniform sampler2D textureDiff; // color map
+uniform sampler2D textureNorm; // normal map
+uniform vec3 light_diffuse;
+uniform vec3 material_diffuse;
+uniform vec3 light_specular;
+uniform vec3 material_specular;
+uniform float material_shininess;
+varying vec2 Vertex_UV;
+varying vec3 Vertex_Normal;
+varying vec3 Vertex_LightDir;
+varying vec3 Vertex_EyeVec;
 
-const vec3 lightPos = 1.5*vec3(1.0, 5.0, 5.0);
-const vec4 lightColor = vec4(1.2, 1.1, 1.1, 3.0);
-const vec4 ambientColor = vec4(1.0, 1.0, 1.0, 0.4);
-const vec3 falloff = vec3(0.1, 0.01, 0.1);
+// http://www.thetenthplanet.de/archives/1180
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
+{
+    // get edge vectors of the pixel triangle
+    vec3 dp1 = dFdx( p );
+    vec3 dp2 = dFdy( p );
+    vec2 duv1 = dFdx( uv );
+    vec2 duv2 = dFdy( uv );
 
+    // solve the linear system
+    vec3 dp2perp = cross( dp2, N );
+    vec3 dp1perp = cross( N, dp1 );
+    vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+    vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+
+    // construct a scale-invariant frame
+    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+    return mat3( T * invmax, B * invmax, N );
+}
+
+vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord )
+{
+    // assume N, the interpolated vertex normal and
+    // V, the view vector (vertex to eye)
+    vec3 map = texture2D(textureNorm, texcoord ).xyz;
+    map = map * 255./127. - 128./127.;
+    mat3 TBN = cotangent_frame(N, -V, texcoord);
+    return normalize(TBN * map);
+}
 
 void main()
 {
+    vec2 uv = Vertex_UV;
 
-    // Extract the normal from the normal map
-    vec3 normal = vNormal + normalize(texture2D(textureNorm, vCoord).rgb * 2.0 - 1.0);
+    vec3 N = normalize(Vertex_Normal);
+    vec3 L = normalize(Vertex_LightDir);
+    vec3 V = normalize(Vertex_EyeVec);
+    vec3 PN = perturb_normal(N, V, uv);
 
-    // Determine where the light is positioned (this can be set however you like)
-    vec3 light_tmp = vec3(-1.1, 0.5*sin(time*5.0), 0.5) - vec3(vCoord, 0.5);
-    vec3 light_pos = normalize(normalize(vec3(1.0, 1.0, 1.0))+ light_tmp);
+    vec3 diff_color = texture2D(textureDiff, uv).rgb;
+    vec3 final_color = vec3(0.2, 0.15, 0.15) * diff_color;
 
-    // Calculate the lighting diffuse value
-    float diffuse = max(dot(normal, light_pos), 0.0);
+    float lambertTerm = dot(PN, L);
+    if (lambertTerm > 0.0) {
+        final_color += light_diffuse * material_diffuse * lambertTerm * diff_color;
 
-    vec3 color = diffuse * texture2D(textureDiff, vCoord).rgb;
-
-    // Set the output color of our current pixel
-    gl_FragColor = vec4(color, 1.0);
+        vec3 E = normalize(Vertex_EyeVec);
+        vec3 R = reflect(-L, PN);
+        float specular = pow( max(dot(R, E), 0.0), material_shininess);
+        final_color += light_specular * material_specular * specular;
+    }
+    //final_color = PN;
+    //final_color = N;
+    gl_FragColor = vec4(final_color, 1.0);
 }
 
 |]

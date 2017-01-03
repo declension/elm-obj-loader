@@ -22,6 +22,7 @@ Vertex normals are calculated for flat shading, but they are currently slightly 
 Only tris and quads are supported. (Tris might load slightly faster)   
 No free-form curves/surfaces.    
 No material library (mtllib) support.   
+No negative indexing.
 
 # Demo/Examples
 [Suzanne from Blender][loaderDemo] / [src](/examples).
