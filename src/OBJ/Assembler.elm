@@ -21,404 +21,56 @@ import OBJ.Types exposing (..)
 -- idea: when adding a face, don't add the indices, add the actuall data.
 -- then in a second step missing data can be easily added,
 -- then do the indexing based on the actual data.
+--
+-- To make things easier, I could just treat "g .." and "o .." the same way.
+-- Or just ignore grouping and only group things if they use a different material.
+--
+-- type alias CompileState =
+--     { currentGroup : Maybe Group
+--     , currentGroupName : String
+--     , currentMaterialName : String
+--     , groups : Dict.Dict String Group
+--     , mtlLib : Maybe String
+--     , objectName : Maybe String
+--     , vns : Array Vec3
+--     , vs : Array Vec3
+--     , vts : Array Vec2
+--     }
 
 
-type alias CompileState =
-    { currentGroup : Maybe Group
-    , currentGroupName : String
-    , groups : Dict.Dict String Group
-    , mtlLib : Maybe String
-    , objectName : Maybe String
-    , vns : Array Vec3
-    , vs : Array Vec3
-    , vts : Array Vec2
-    }
-
-
-compile : List Line -> Dict.Dict String Mesh
 compile lines =
     compileHelper emptyCompileState lines
+        |> addCurrentMesh
         |> addCurrentGroup
-        |> toMeshes
+        |> .groups
 
 
-emptyCompileState : CompileState
+
+--        |> toMeshes
+-- emptyCompileState : CompileState
+
+
 emptyCompileState =
-    { groups = Dict.empty
-    , currentGroupName = "default"
-    , objectName = Nothing
-    , mtlLib = Nothing
-    , currentGroup = Nothing
+    { -- this is a Dict (GroupName/String) Group
+      -- it's the final output of this algorithm
+      --  Group = Dict (MtlName/String) Mesh
+      groups = Dict.empty
+    , currentGroupName = "__default__"
+    , currentMaterialName = "__default__"
+    , activeSmoothGroop = "off"
+    , currentMesh = Nothing
+    , currentGroup = Dict.empty
     , vs = Array.empty
     , vts = Array.empty
     , vns = Array.empty
+    , currentIndex = 0
     }
 
 
-log s a =
-    let
-        _ =
-            Debug.log s ()
-    in
-        a
 
+-- compileHelper : CompileState -> List Line -> CompileState
 
-toMeshes : CompileState -> Dict String Mesh
-toMeshes state =
-    Dict.map
-        (\groupName group ->
-            case group of
-                GV { faces } ->
-                    WithoutTexture (makeMeshV state.vs faces)
-                        |> log "GV"
 
-                GVT { faces } ->
-                    WithTexture (makeMeshVT state.vs state.vts faces)
-                        |> log "GVT"
-
-                GVN { faces } ->
-                    WithoutTexture (makeMeshVN state.vs state.vns faces)
-                        |> log "GVN"
-
-                GVTN { faces } ->
-                    WithTexture (makeMeshVNT state.vs state.vns state.vts faces)
-                        |> log "GVTN"
-        )
-        state.groups
-
-
-makeMeshV : Array Vec3 -> List Int3 -> MeshWith Vertex
-makeMeshV vs fs =
-    makeMeshVHelper vs fs { verts = [], is = [], i = 0 }
-        |> (\{ is, verts } -> { vertices = verts, indices = is })
-
-
-type alias TempMesh a =
-    { i : Int
-    , is : List Int3
-    , verts : List a
-    }
-
-
-makeMeshVHelper : Array Vec3 -> List Int3 -> TempMesh Vertex -> TempMesh Vertex
-makeMeshVHelper vs faces state =
-    case faces of
-        ( v1, v2, v3 ) :: fs ->
-            case ( Array.get (v1 - 1) vs, Array.get (v2 - 1) vs, Array.get (v3 - 1) vs ) of
-                ( Just a, Just b, Just c ) ->
-                    let
-                        norm =
-                            getNormalTo ( c, b, a )
-                    in
-                        makeMeshVHelper vs
-                            fs
-                            { state
-                                | verts = state.verts ++ [ { pos = a, norm = norm }, { pos = b, norm = norm }, { pos = c, norm = norm } ]
-                                , is = ( state.i + 2, state.i + 1, state.i ) :: state.is
-                                , i = state.i + 3
-                            }
-
-                _ ->
-                    Debug.crash
-                        ("Index out of bound: "
-                            ++ toString ( v1, v2, v3 )
-                            ++ "\n\n"
-                            ++ "vs: "
-                            ++ toString (Array.length vs)
-                        )
-
-        [] ->
-            state
-
-
-makeMeshVN : Array Vec3 -> Array Vec3 -> List ( Int2, Int2, Int2 ) -> MeshWith Vertex
-makeMeshVN vs vns fs =
-    makeMeshVNHelper vs vns fs { verts = [], is = [], i = 0, knowns = Dict.empty }
-        |> (\{ is, verts } -> { vertices = verts, indices = is })
-
-
-type alias TempMeshWithDict i a =
-    { i : Int
-    , is : List Int3
-    , verts : List a
-    , knowns : Dict i ( Int, a )
-    }
-
-
-makeMeshVNHelper :
-    Array Vec3
-    -> Array Vec3
-    -> List ( Int2, Int2, Int2 )
-    -> TempMeshWithDict Int2 Vertex
-    -> TempMeshWithDict Int2 Vertex
-makeMeshVNHelper vs vns faces state =
-    case faces of
-        ( ( v1, vn1 ), ( v2, vn2 ), ( v3, vn3 ) ) :: fs ->
-            let
-                ( newState, newIs, newVerts ) =
-                    getOrUpdateCoordsVN vs vns [ ( v1, vn1 ), ( v2, vn2 ), ( v3, vn3 ) ] state
-            in
-                makeMeshVNHelper vs
-                    vns
-                    fs
-                    { newState
-                        | verts = state.verts ++ newVerts
-                        , is = newIs :: state.is
-                    }
-
-        [] ->
-            state
-
-
-makeMeshVNT :
-    Array Vec3
-    -> Array Vec3
-    -> Array Vec2
-    -> List ( Int3, Int3, Int3 )
-    -> MeshWith VertexWithTexture
-makeMeshVNT vs vns vts fs =
-    makeMeshVNTHelper vs vns vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
-        |> (\{ is, verts } -> { vertices = verts, indices = is })
-
-
-makeMeshVNTHelper :
-    Array Vec3
-    -> Array Vec3
-    -> Array Vec2
-    -> List ( Int3, Int3, Int3 )
-    -> TempMeshWithDict Int3 VertexWithTexture
-    -> TempMeshWithDict Int3 VertexWithTexture
-makeMeshVNTHelper vs vns vts faces state =
-    case faces of
-        ( ( v1, vt1, vn1 ), ( v2, vt2, vn2 ), ( v3, vt3, vn3 ) ) :: fs ->
-            let
-                ( newState, newIs, newVerts ) =
-                    getOrUpdateCoordsNT vs vns vts [ ( v1, vt1, vn1 ), ( v2, vt2, vn2 ), ( v3, vt3, vn3 ) ] state
-            in
-                makeMeshVNTHelper vs
-                    vns
-                    vts
-                    fs
-                    { newState
-                        | verts = state.verts ++ newVerts
-                        , is = newIs :: state.is
-                    }
-
-        [] ->
-            state
-
-
-makeMeshVT :
-    Array Vec3
-    -> Array Vec2
-    -> List ( Int2, Int2, Int2 )
-    -> MeshWith VertexWithTexture
-makeMeshVT vs vts fs =
-    makeMeshVTHelper vs vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
-        |> (\{ is, verts } -> { vertices = verts, indices = is })
-
-
-type alias TempMeshVT =
-    { i : Int
-    , is : List Int3
-    , verts : List VertexWithTexture
-    , knowns : Dict Int2 ( Int, { coord : Vec2, pos : Vec3 } )
-    }
-
-
-makeMeshVTHelper :
-    Array Vec3
-    -> Array Vec2
-    -> List ( Int2, Int2, Int2 )
-    -> TempMeshVT
-    -> TempMeshVT
-makeMeshVTHelper vs vts faces state =
-    case faces of
-        ( ( v1, vt1 ), ( v2, vt2 ), ( v3, vt3 ) ) :: fs ->
-            let
-                ( newState, newIs, newVerts ) =
-                    getOrUpdateCoordsT vs vts [ ( v1, vt1 ), ( v2, vt2 ), ( v3, vt3 ) ] state
-            in
-                case ( Array.get (v1 - 1) vs, Array.get (v2 - 1) vs, Array.get (v3 - 1) vs ) of
-                    ( Just a, Just b, Just c ) ->
-                        makeMeshVTHelper vs
-                            vts
-                            fs
-                            { newState
-                                | verts =
-                                    state.verts
-                                        ++ (List.map
-                                                (\{ pos, coord } ->
-                                                    { pos = pos, coord = coord, norm = getNormalTo ( c, b, a ) }
-                                                )
-                                                newVerts
-                                           )
-                                , is = newIs :: state.is
-                            }
-
-                    _ ->
-                        Debug.crash "Index out of bound"
-
-        [] ->
-            state
-
-
-get3 : ( Int, Int, Int ) -> Array a -> Maybe ( a, a, a )
-get3 ( a, b, c ) array =
-    case ( Array.get a array, Array.get b array, Array.get c array ) of
-        ( Just a, Just b, Just c ) ->
-            Just ( a, b, c )
-
-        _ ->
-            Nothing
-
-
-getOrUpdateCoordsVN vs vns coords state =
-    getOrUpdateCoordsHelperVN vs vns coords ( state, [], [] )
-        |> (\( s, is, verts ) ->
-                case is of
-                    [ a, b, c ] ->
-                        ( s, ( a, b, c ), verts )
-
-                    _ ->
-                        Debug.crash "This can't happen"
-           )
-
-
-getOrUpdateCoordsNT vs vns vts coords state =
-    getOrUpdateCoordsNTHelper vs vns vts coords ( state, [], [] )
-        |> (\( s, is, verts ) ->
-                case is of
-                    [ a, b, c ] ->
-                        ( s, ( a, b, c ), verts )
-
-                    _ ->
-                        Debug.crash "This can't happen"
-           )
-
-
-getOrUpdateCoordsT vs vts coords state =
-    getOrUpdateCoordsTHelper vs vts coords ( state, [], [] )
-        |> (\( s, is, verts ) ->
-                case is of
-                    [ a, b, c ] ->
-                        ( s, ( a, b, c ), verts )
-
-                    _ ->
-                        Debug.crash "This can't happen"
-           )
-
-
-getOrUpdateCoordsNTHelper vs vns vts coords ( state, is, verts ) =
-    case coords of
-        [] ->
-            ( state, is, verts )
-
-        ( c, ct, cn ) :: cs ->
-            case Dict.get ( c, cn, ct ) state.knowns of
-                Just ( i, v ) ->
-                    getOrUpdateCoordsNTHelper vs vns vts cs ( state, i :: is, verts )
-
-                Nothing ->
-                    case ( Array.get (c - 1) vs, Array.get (cn - 1) vns, Array.get (ct - 1) vts ) of
-                        ( Just v, Just n, Just t ) ->
-                            getOrUpdateCoordsNTHelper vs
-                                vns
-                                vts
-                                cs
-                                ( { state
-                                    | knowns = Dict.insert ( c, cn, ct ) ( state.i, { pos = v, norm = n, coord = t } ) state.knowns
-                                    , i = state.i + 1
-                                  }
-                                , state.i :: is
-                                , verts ++ [ { pos = v, norm = n, coord = t } ]
-                                )
-
-                        _ ->
-                            Debug.crash ("Index out of bounds!\n\n" ++ toString (Array.length vns))
-
-
-getOrUpdateCoordsTHelper vs vts coords ( state, is, verts ) =
-    case coords of
-        [] ->
-            ( state, is, verts )
-
-        ( c, ct ) :: cs ->
-            case Dict.get ( c, ct ) state.knowns of
-                Just ( i, v ) ->
-                    getOrUpdateCoordsTHelper vs vts cs ( state, i :: is, verts )
-
-                Nothing ->
-                    case ( Array.get (c - 1) vs, Array.get (ct - 1) vts ) of
-                        ( Just v, Just t ) ->
-                            getOrUpdateCoordsTHelper vs
-                                vts
-                                cs
-                                ( { state
-                                    | knowns = Dict.insert ( c, ct ) ( state.i, { pos = v, coord = t } ) state.knowns
-                                    , i = state.i + 1
-                                  }
-                                , state.i :: is
-                                , verts ++ [ { pos = v, coord = t } ]
-                                )
-
-                        _ ->
-                            Debug.crash "Index out of bounds!"
-
-
-getOrUpdateCoordsHelperVN vs vns coords ( state, is, verts ) =
-    case coords of
-        [] ->
-            ( state, is, verts )
-
-        ( c, cn ) :: cs ->
-            case Dict.get ( c, cn ) state.knowns of
-                Just ( i, v ) ->
-                    getOrUpdateCoordsHelperVN vs vns cs ( state, i :: is, verts )
-
-                Nothing ->
-                    case ( Array.get (c - 1) vs, Array.get (cn - 1) vns ) of
-                        ( Just v, Just n ) ->
-                            getOrUpdateCoordsHelperVN vs
-                                vns
-                                cs
-                                ( { state
-                                    | knowns = Dict.insert ( c, cn ) ( state.i, { pos = v, norm = n } ) state.knowns
-                                    , i = state.i + 1
-                                  }
-                                , state.i :: is
-                                , { pos = v, norm = n } :: verts
-                                )
-
-                        _ ->
-                            Debug.crash "Index out of bounds!"
-
-
-{-| (v1, v2, v3) are assumed to be given in counter clock direction
--}
-getNormalTo : ( Vec3, Vec3, Vec3 ) -> Vec3
-getNormalTo ( v1, v2, v3 ) =
-    V3.normalize (V3.cross (V3.sub v1 v2) (V3.sub v3 v2))
-
-
-addCurrentGroup : CompileState -> CompileState
-addCurrentGroup state =
-    let
-        _ =
-            Debug.log "(vs, vns, vts)" ( Array.length state.vs, Array.length state.vns, Array.length state.vts )
-    in
-        case state.currentGroup of
-            Just g ->
-                { state
-                    | groups = Dict.insert state.currentGroupName g state.groups
-                    , currentGroup = Nothing
-                }
-
-            Nothing ->
-                state
-
-
-compileHelper : CompileState -> List Line -> CompileState
 compileHelper state lines =
     case lines of
         [] ->
@@ -428,26 +80,39 @@ compileHelper state lines =
             compileHelper (insertLine l state) ls
 
 
-insertLine : Line -> CompileState -> CompileState
+
+-- insertLine : Line -> CompileState -> CompileState
+
+
+{-|
+this 'inserts' a line into the state.
+This means it manipulates the current state to reflect state changing commands
+and buils meshes on the fly.
+-}
 insertLine line state =
     case line of
         Object s ->
-            { state | objectName = Just s }
+            -- { state | objectName = Just s }
+            -- "o .."" statements are ignored,
+            -- because the specs doesn't give it any meaningful meaning.
+            state
 
         MtlLib s ->
-            { state | mtlLib = Just s }
+            -- { state | mtlLib = Just s }
+            -- MtlLib statements are ignored,
+            -- as I don't plan to support loading .mtl files
+            state
 
         Group s ->
             addCurrentGroup state
                 |> (\st -> { st | currentGroupName = s })
 
         Smooth s ->
-            -- is currently ignored
-            state
+            { state | activeSmoothGroop = s }
 
         UseMtl s ->
-            -- currently ignored
-            state
+            addCurrentMesh state
+                |> (\st -> { st | currentMaterialName = s })
 
         V v ->
             { state | vs = Array.push v state.vs }
@@ -459,67 +124,546 @@ insertLine line state =
             { state | vns = Array.push v state.vns }
 
         F f ->
-            addFace f state
+            triangulateFace f
+                |> List.foldr addFace state
 
 
-{-| This function adds a face to the current faces list.
-    Since there are 4*2 different face types and 4 + 1 different Mesh types,
-    this function has 4*2*2 branches.
-    (The meshes only add two different branches per face type)
--}
-addFace : Face -> { a | currentGroup : Maybe Group } -> { a | currentGroup : Maybe Group }
+triangulateFace f =
+    case f of
+        FVertex a ->
+            triangulate a |> List.map FTVertex
+
+        FVertexTexture a ->
+            triangulate a |> List.map FTVertexTexture
+
+        FVertexTextureNormal a ->
+            triangulate a |> List.map FTVertexTextureNormal
+
+        FVertexNormal a ->
+            triangulate a |> List.map FTVertexNormal
+
+
+addCurrentMesh state =
+    -- this should add the current mesh, to the current group.
+    -- We can also normalize all values here that need normalizing
+    case state.currentMesh of
+        Just m ->
+            { state | currentGroup = Dict.insert state.currentMaterialName m state.currentGroup }
+
+        _ ->
+            state
+
+
+
+-- addCurrentGroup : CompileState -> CompileState
+
+
+addCurrentGroup state =
+    if Dict.isEmpty state.currentGroup then
+        state
+    else
+        { state
+            | groups = Dict.insert state.currentGroupName state.currentGroup state.groups
+            , currentGroup = Dict.empty
+        }
+
+
 addFace f state =
-    case ( state.currentGroup, f ) of
-        ( Just (GV ({ faces } as g)), FVertex v ) ->
-            { state | currentGroup = Just (GV { g | faces = v :: faces }) }
+    -- this function should add a single face to the currentMesh
+    -- for this it needs a dictionary containing the already known vertices,
+    -- indexed using the v/vn etc. indices together with the smooth group
+    -- flat shading needs to use a unique index for the smooth group to avoid sharing vertices.
+    case state.currentMesh of
+        Nothing ->
+            -- we dont have a mesh yet, create one based on the type of the face
+            -- { state | currentMesh = Just (addFaceToMesh state f (createMesh f)) }
+            addFaceToMesh f (createMesh f) { state | currentIndex = 0 }
 
-        ( Just (GV ({ faces } as g)), FVertex4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GV { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+        Just m ->
+            -- { state | currentMesh = Just (addFaceToMesh state f m) }
+            addFaceToMesh f m state
 
-        ( Nothing, FVertex v ) ->
-            { state | currentGroup = Just (GV { faces = [ v ] }) }
 
-        ( Nothing, FVertex4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GV { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
+    -- add a face to the mesh
+    case ( f, mesh ) of
+        ( FTVertexTextureNormal ( ( vi1, ti1, ni1 ) as v1, ( vi2, ti2, ni2 ) as v2, ( vi3, ti3, ni3 ) as v3 ), WithTexture m ) ->
+            -- TODO: only add a new vertex if we don't know it already
+            let
+                i =
+                    currentIndex
 
-        ( Just (GVN ({ faces } as g)), FVertexNormal v ) ->
-            { state | currentGroup = Just (GVN { g | faces = v :: faces }) }
+                ( ( p1, t1, n1 ), ( p2, t2, n2 ), ( p3, t3, n3 ) ) =
+                    ( unsafeGet3 ( vi1 - 1, ti1 - 1, ni1 - 1 ) vs vts vns
+                    , unsafeGet3 ( vi2 - 1, ti2 - 1, ni2 - 1 ) vs vts vns
+                    , unsafeGet3 ( vi3 - 1, ti3 - 1, ni3 - 1 ) vs vts vns
+                    )
 
-        ( Just (GVN ({ faces } as g)), FVertexNormal4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVN { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+                newVs =
+                    [ VertexWithTexture p1 t1 n1, VertexWithTexture p2 t2 n2, VertexWithTexture p3 t3 n3 ]
 
-        ( Nothing, FVertexNormal v ) ->
-            { state | currentGroup = Just (GVN { faces = [ v ] }) }
+                newIs =
+                    ( i + 2, i + 1, i )
 
-        ( Nothing, FVertexNormal4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVN { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+                newMesh =
+                    WithTexture { m | indices = newIs :: m.indices, vertices = m.vertices ++ newVs }
+            in
+                { state | currentMesh = Just newMesh, currentIndex = i + 3 }
 
-        ( Just (GVT ({ faces } as g)), FVertexTexture v ) ->
-            { state | currentGroup = Just (GVT { g | faces = v :: faces }) }
+        _ ->
+            Debug.crash "todo"
 
-        ( Just (GVT ({ faces } as g)), FVertexTexture4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVT { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
 
-        ( Nothing, FVertexTexture v ) ->
-            { state | currentGroup = Just (GVT { faces = [ v ] }) }
+getFaceNormal v1 v2 v3 =
+    V3.normalize (V3.cross (V3.sub v1 v2) (V3.sub v3 v2))
 
-        ( Nothing, FVertexTexture4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVT { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
 
-        ( Just (GVTN ({ faces } as g)), FVertexTextureNormal v ) ->
-            { state | currentGroup = Just (GVTN { g | faces = v :: faces }) }
+triangulate threeOrFour =
+    case threeOrFour of
+        Three t ->
+            [ t ]
 
-        ( Just (GVTN ({ faces } as g)), FVertexTextureNormal4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVTN { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+        Four ( a, b, c, d ) ->
+            [ ( a, b, c ), ( a, c, d ) ]
 
-        ( Nothing, FVertexTextureNormal v ) ->
-            { state | currentGroup = Just (GVTN { faces = [ v ] }) }
 
-        ( Nothing, FVertexTextureNormal4 ( a, b, c, d ) ) ->
-            { state | currentGroup = Just (GVTN { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+createMesh f =
+    let
+        emptyMesh =
+            { vertices = [], indices = [] }
+    in
+        case f of
+            FTVertex _ ->
+                WithoutTexture emptyMesh
 
-        ( mesh, face ) ->
-            Debug.crash
-                ("Faces should all be the same type!\nMesh, face pair:\n\n"
-                    ++ toString ( state.currentGroup, face )
-                )
+            FTVertexTexture _ ->
+                -- TODO: if with or without tangent should depend on the user config
+                WithTexture emptyMesh
+
+            FTVertexTextureNormal _ ->
+                WithTexture emptyMesh
+
+            FTVertexNormal _ ->
+                WithoutTexture emptyMesh
+
+
+
+-- {-| This function adds a face to the current faces list.
+--     Since there are 4*2 different face types and 4 + 1 different Mesh types,
+--     this function has 4*2*2 branches.
+--     (The meshes only add two different branches per face type)
+-- -}
+-- addFace f state =
+--     case ( state.currentGroup, f ) of
+--         ( Just (GV ({ faces } as g)), FVertex v ) ->
+--             { state | currentGroup = Just (GV { g | faces = v :: faces }) }
+--
+--         ( Just (GV ({ faces } as g)), FVertex4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GV { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+--
+--         ( Nothing, FVertex v ) ->
+--             { state | currentGroup = Just (GV { faces = [ v ] }) }
+--
+--         ( Nothing, FVertex4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GV { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+--
+--         ( Just (GVN ({ faces } as g)), FVertexNormal v ) ->
+--             { state | currentGroup = Just (GVN { g | faces = v :: faces }) }
+--
+--         ( Just (GVN ({ faces } as g)), FVertexNormal4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVN { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+--
+--         ( Nothing, FVertexNormal v ) ->
+--             { state | currentGroup = Just (GVN { faces = [ v ] }) }
+--
+--         ( Nothing, FVertexNormal4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVN { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+--
+--         ( Just (GVT ({ faces } as g)), FVertexTexture v ) ->
+--             { state | currentGroup = Just (GVT { g | faces = v :: faces }) }
+--
+--         ( Just (GVT ({ faces } as g)), FVertexTexture4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVT { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+--
+--         ( Nothing, FVertexTexture v ) ->
+--             { state | currentGroup = Just (GVT { faces = [ v ] }) }
+--
+--         ( Nothing, FVertexTexture4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVT { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+--
+--         ( Just (GVTN ({ faces } as g)), FVertexTextureNormal v ) ->
+--             { state | currentGroup = Just (GVTN { g | faces = v :: faces }) }
+--
+--         ( Just (GVTN ({ faces } as g)), FVertexTextureNormal4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVTN { g | faces = ( a, b, c ) :: ( c, d, a ) :: faces }) }
+--
+--         ( Nothing, FVertexTextureNormal v ) ->
+--             { state | currentGroup = Just (GVTN { faces = [ v ] }) }
+--
+--         ( Nothing, FVertexTextureNormal4 ( a, b, c, d ) ) ->
+--             { state | currentGroup = Just (GVTN { faces = [ ( a, b, c ), ( c, d, a ) ] }) }
+--
+--         ( mesh, face ) ->
+--             Debug.crash
+--                 ("Faces should all be the same type!\nMesh, face pair:\n\n"
+--                     ++ toString ( state.currentGroup, face )
+--                 )
+--
+-- {-| (v1, v2, v3) are assumed to be given in counter clock direction
+-- -}
+-- getNormalTo : ( Vec3, Vec3, Vec3 ) -> Vec3
+-- getNormalTo ( v1, v2, v3 ) =
+--     V3.normalize (V3.cross (V3.sub v1 v2) (V3.sub v3 v2))
+
+
+log s a =
+    let
+        _ =
+            Debug.log s ()
+    in
+        a
+
+
+unsafeGet3 : ( Int, Int, Int ) -> Array a -> Array b -> Array c -> ( a, b, c )
+unsafeGet3 ( a, b, c ) a1 a2 a3 =
+    case ( Array.get a a1, Array.get b a2, Array.get c a3 ) of
+        ( Just a, Just b, Just c ) ->
+            ( a, b, c )
+
+        _ ->
+            Debug.crash "index out of bounds!"
+
+
+
+--
+-- get3 : ( Int, Int, Int ) -> Array a -> Maybe ( a, a, a )
+-- get3 ( a, b, c ) array =
+--     case ( Array.get a array, Array.get b array, Array.get c array ) of
+--         ( Just a, Just b, Just c ) ->
+--             Just ( a, b, c )
+--
+--         _ ->
+--             Nothing
+--
+--
+-- toMeshes : CompileState -> Dict String Mesh
+-- toMeshes state =
+--     Dict.map
+--         (\groupName group ->
+--             case group of
+--                 GV { faces } ->
+--                     WithoutTexture (makeMeshV state.vs faces)
+--                         |> log "GV"
+--
+--                 GVT { faces } ->
+--                     WithTexture (makeMeshVT state.vs state.vts faces)
+--                         |> log "GVT"
+--
+--                 GVN { faces } ->
+--                     WithoutTexture (makeMeshVN state.vs state.vns faces)
+--                         |> log "GVN"
+--
+--                 GVTN { faces } ->
+--                     WithTexture (makeMeshVNT state.vs state.vns state.vts faces)
+--                         |> log "GVTN"
+--         )
+--         state.groups
+--
+--
+-- makeMeshV : Array Vec3 -> List Int3 -> MeshWith Vertex
+-- makeMeshV vs fs =
+--     makeMeshVHelper vs fs { verts = [], is = [], i = 0 }
+--         |> (\{ is, verts } -> { vertices = verts, indices = is })
+--
+--
+-- type alias TempMesh a =
+--     { i : Int
+--     , is : List Int3
+--     , verts : List a
+--     }
+--
+--
+-- makeMeshVHelper : Array Vec3 -> List Int3 -> TempMesh Vertex -> TempMesh Vertex
+-- makeMeshVHelper vs faces state =
+--     case faces of
+--         ( v1, v2, v3 ) :: fs ->
+--             case ( Array.get (v1 - 1) vs, Array.get (v2 - 1) vs, Array.get (v3 - 1) vs ) of
+--                 ( Just a, Just b, Just c ) ->
+--                     let
+--                         norm =
+--                             getNormalTo ( c, b, a )
+--                     in
+--                         makeMeshVHelper vs
+--                             fs
+--                             { state
+--                                 | verts = state.verts ++ [ { pos = a, norm = norm }, { pos = b, norm = norm }, { pos = c, norm = norm } ]
+--                                 , is = ( state.i + 2, state.i + 1, state.i ) :: state.is
+--                                 , i = state.i + 3
+--                             }
+--
+--                 _ ->
+--                     Debug.crash
+--                         ("Index out of bound: "
+--                             ++ toString ( v1, v2, v3 )
+--                             ++ "\n\n"
+--                             ++ "vs: "
+--                             ++ toString (Array.length vs)
+--                         )
+--
+--         [] ->
+--             state
+--
+--
+-- makeMeshVN : Array Vec3 -> Array Vec3 -> List ( Int2, Int2, Int2 ) -> MeshWith Vertex
+-- makeMeshVN vs vns fs =
+--     makeMeshVNHelper vs vns fs { verts = [], is = [], i = 0, knowns = Dict.empty }
+--         |> (\{ is, verts } -> { vertices = verts, indices = is })
+--
+--
+-- type alias TempMeshWithDict i a =
+--     { i : Int
+--     , is : List Int3
+--     , verts : List a
+--     , knowns : Dict i ( Int, a )
+--     }
+--
+--
+-- makeMeshVNHelper :
+--     Array Vec3
+--     -> Array Vec3
+--     -> List ( Int2, Int2, Int2 )
+--     -> TempMeshWithDict Int2 Vertex
+--     -> TempMeshWithDict Int2 Vertex
+-- makeMeshVNHelper vs vns faces state =
+--     case faces of
+--         ( ( v1, vn1 ), ( v2, vn2 ), ( v3, vn3 ) ) :: fs ->
+--             let
+--                 ( newState, newIs, newVerts ) =
+--                     getOrUpdateCoordsVN vs vns [ ( v1, vn1 ), ( v2, vn2 ), ( v3, vn3 ) ] state
+--             in
+--                 makeMeshVNHelper vs
+--                     vns
+--                     fs
+--                     { newState
+--                         | verts = state.verts ++ newVerts
+--                         , is = newIs :: state.is
+--                     }
+--
+--         [] ->
+--             state
+--
+--
+-- makeMeshVNT :
+--     Array Vec3
+--     -> Array Vec3
+--     -> Array Vec2
+--     -> List ( Int3, Int3, Int3 )
+--     -> MeshWith VertexWithTexture
+-- makeMeshVNT vs vns vts fs =
+--     makeMeshVNTHelper vs vns vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
+--         |> (\{ is, verts } -> { vertices = verts, indices = is })
+--
+--
+-- makeMeshVNTHelper :
+--     Array Vec3
+--     -> Array Vec3
+--     -> Array Vec2
+--     -> List ( Int3, Int3, Int3 )
+--     -> TempMeshWithDict Int3 VertexWithTexture
+--     -> TempMeshWithDict Int3 VertexWithTexture
+-- makeMeshVNTHelper vs vns vts faces state =
+--     case faces of
+--         ( ( v1, vt1, vn1 ), ( v2, vt2, vn2 ), ( v3, vt3, vn3 ) ) :: fs ->
+--             let
+--                 ( newState, newIs, newVerts ) =
+--                     getOrUpdateCoordsNT vs vns vts [ ( v1, vt1, vn1 ), ( v2, vt2, vn2 ), ( v3, vt3, vn3 ) ] state
+--             in
+--                 makeMeshVNTHelper vs
+--                     vns
+--                     vts
+--                     fs
+--                     { newState
+--                         | verts = state.verts ++ newVerts
+--                         , is = newIs :: state.is
+--                     }
+--
+--         [] ->
+--             state
+--
+--
+-- makeMeshVT :
+--     Array Vec3
+--     -> Array Vec2
+--     -> List ( Int2, Int2, Int2 )
+--     -> MeshWith VertexWithTexture
+-- makeMeshVT vs vts fs =
+--     makeMeshVTHelper vs vts fs { verts = [], is = [], i = 0, knowns = Dict.empty }
+--         |> (\{ is, verts } -> { vertices = verts, indices = is })
+--
+--
+-- type alias TempMeshVT =
+--     { i : Int
+--     , is : List Int3
+--     , verts : List VertexWithTexture
+--     , knowns : Dict Int2 ( Int, { coord : Vec2, pos : Vec3 } )
+--     }
+--
+--
+-- makeMeshVTHelper :
+--     Array Vec3
+--     -> Array Vec2
+--     -> List ( Int2, Int2, Int2 )
+--     -> TempMeshVT
+--     -> TempMeshVT
+-- makeMeshVTHelper vs vts faces state =
+--     case faces of
+--         ( ( v1, vt1 ), ( v2, vt2 ), ( v3, vt3 ) ) :: fs ->
+--             let
+--                 ( newState, newIs, newVerts ) =
+--                     getOrUpdateCoordsT vs vts [ ( v1, vt1 ), ( v2, vt2 ), ( v3, vt3 ) ] state
+--             in
+--                 case ( Array.get (v1 - 1) vs, Array.get (v2 - 1) vs, Array.get (v3 - 1) vs ) of
+--                     ( Just a, Just b, Just c ) ->
+--                         makeMeshVTHelper vs
+--                             vts
+--                             fs
+--                             { newState
+--                                 | verts =
+--                                     state.verts
+--                                         ++ (List.map
+--                                                 (\{ pos, coord } ->
+--                                                     { pos = pos, coord = coord, norm = getNormalTo ( c, b, a ) }
+--                                                 )
+--                                                 newVerts
+--                                            )
+--                                 , is = newIs :: state.is
+--                             }
+--
+--                     _ ->
+--                         Debug.crash "Index out of bound"
+--
+--         [] ->
+--             state
+--
+--
+--
+--
+-- getOrUpdateCoordsVN vs vns coords state =
+--     getOrUpdateCoordsHelperVN vs vns coords ( state, [], [] )
+--         |> (\( s, is, verts ) ->
+--                 case is of
+--                     [ a, b, c ] ->
+--                         ( s, ( a, b, c ), verts )
+--
+--                     _ ->
+--                         Debug.crash "This can't happen"
+--            )
+--
+--
+-- getOrUpdateCoordsNT vs vns vts coords state =
+--     getOrUpdateCoordsNTHelper vs vns vts coords ( state, [], [] )
+--         |> (\( s, is, verts ) ->
+--                 case is of
+--                     [ a, b, c ] ->
+--                         ( s, ( a, b, c ), verts )
+--
+--                     _ ->
+--                         Debug.crash "This can't happen"
+--            )
+--
+--
+-- getOrUpdateCoordsT vs vts coords state =
+--     getOrUpdateCoordsTHelper vs vts coords ( state, [], [] )
+--         |> (\( s, is, verts ) ->
+--                 case is of
+--                     [ a, b, c ] ->
+--                         ( s, ( a, b, c ), verts )
+--
+--                     _ ->
+--                         Debug.crash "This can't happen"
+--            )
+--
+--
+-- getOrUpdateCoordsNTHelper vs vns vts coords ( state, is, verts ) =
+--     case coords of
+--         [] ->
+--             ( state, is, verts )
+--
+--         ( c, ct, cn ) :: cs ->
+--             case Dict.get ( c, cn, ct ) state.knowns of
+--                 Just ( i, v ) ->
+--                     getOrUpdateCoordsNTHelper vs vns vts cs ( state, i :: is, verts )
+--
+--                 Nothing ->
+--                     case ( Array.get (c - 1) vs, Array.get (cn - 1) vns, Array.get (ct - 1) vts ) of
+--                         ( Just v, Just n, Just t ) ->
+--                             getOrUpdateCoordsNTHelper vs
+--                                 vns
+--                                 vts
+--                                 cs
+--                                 ( { state
+--                                     | knowns = Dict.insert ( c, cn, ct ) ( state.i, { pos = v, norm = n, coord = t } ) state.knowns
+--                                     , i = state.i + 1
+--                                   }
+--                                 , state.i :: is
+--                                 , verts ++ [ { pos = v, norm = n, coord = t } ]
+--                                 )
+--
+--                         _ ->
+--                             Debug.crash ("Index out of bounds!\n\n" ++ toString (Array.length vns))
+--
+--
+-- getOrUpdateCoordsTHelper vs vts coords ( state, is, verts ) =
+--     case coords of
+--         [] ->
+--             ( state, is, verts )
+--
+--         ( c, ct ) :: cs ->
+--             case Dict.get ( c, ct ) state.knowns of
+--                 Just ( i, v ) ->
+--                     getOrUpdateCoordsTHelper vs vts cs ( state, i :: is, verts )
+--
+--                 Nothing ->
+--                     case ( Array.get (c - 1) vs, Array.get (ct - 1) vts ) of
+--                         ( Just v, Just t ) ->
+--                             getOrUpdateCoordsTHelper vs
+--                                 vts
+--                                 cs
+--                                 ( { state
+--                                     | knowns = Dict.insert ( c, ct ) ( state.i, { pos = v, coord = t } ) state.knowns
+--                                     , i = state.i + 1
+--                                   }
+--                                 , state.i :: is
+--                                 , verts ++ [ { pos = v, coord = t } ]
+--                                 )
+--
+--                         _ ->
+--                             Debug.crash "Index out of bounds!"
+--
+--
+-- getOrUpdateCoordsHelperVN vs vns coords ( state, is, verts ) =
+--     case coords of
+--         [] ->
+--             ( state, is, verts )
+--
+--         ( c, cn ) :: cs ->
+--             case Dict.get ( c, cn ) state.knowns of
+--                 Just ( i, v ) ->
+--                     getOrUpdateCoordsHelperVN vs vns cs ( state, i :: is, verts )
+--
+--                 Nothing ->
+--                     case ( Array.get (c - 1) vs, Array.get (cn - 1) vns ) of
+--                         ( Just v, Just n ) ->
+--                             getOrUpdateCoordsHelperVN vs
+--                                 vns
+--                                 cs
+--                                 ( { state
+--                                     | knowns = Dict.insert ( c, cn ) ( state.i, { pos = v, norm = n } ) state.knowns
+--                                     , i = state.i + 1
+--                                   }
+--                                 , state.i :: is
+--                                 , { pos = v, norm = n } :: verts
+--                                 )
+--
+--                         _ ->
+--                             Debug.crash "Index out of bounds!"

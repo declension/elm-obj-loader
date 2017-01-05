@@ -7,6 +7,7 @@ import Math.Vector2 exposing (Vec2)
 type Mesh
     = WithoutTexture (MeshWith Vertex)
     | WithTexture (MeshWith VertexWithTexture)
+    | WithTextureAndTangent (MeshWith VertexWithTextureAndTangent)
 
 
 type alias MeshWith a =
@@ -15,16 +16,16 @@ type alias MeshWith a =
     }
 
 
-type alias VertexWith a =
-    { a | pos : Vec3, norm : Vec3 }
-
-
 type alias Vertex =
-    VertexWith {}
+    { position : Vec3, normal : Vec3 }
 
 
 type alias VertexWithTexture =
-    VertexWith { coord : Vec2 }
+    { position : Vec3, texCoord : Vec2, normal : Vec3 }
+
+
+type alias VertexWithTextureAndTangent =
+    { position : Vec3, texCoord : Vec2, normal : Vec3, tangent : Vec3 }
 
 
 type
@@ -49,14 +50,22 @@ type
 
 
 type Face
-    = FVertex ( Int, Int, Int )
-    | FVertex4 ( Int, Int, Int, Int )
-    | FVertexTexture ( Int2, Int2, Int2 )
-    | FVertexTexture4 ( Int2, Int2, Int2, Int2 )
-    | FVertexTextureNormal ( Int3, Int3, Int3 )
-    | FVertexTextureNormal4 ( Int3, Int3, Int3, Int3 )
-    | FVertexNormal ( Int2, Int2, Int2 )
-    | FVertexNormal4 ( Int2, Int2, Int2, Int2 )
+    = FVertex (ThreeOrFour Int)
+    | FVertexTexture (ThreeOrFour Int2)
+    | FVertexTextureNormal (ThreeOrFour Int3)
+    | FVertexNormal (ThreeOrFour Int2)
+
+
+type FaceTriangle
+    = FTVertex ( Int, Int, Int )
+    | FTVertexTexture ( Int2, Int2, Int2 )
+    | FTVertexTextureNormal ( Int3, Int3, Int3 )
+    | FTVertexNormal ( Int2, Int2, Int2 )
+
+
+type ThreeOrFour a
+    = Three ( a, a, a )
+    | Four ( a, a, a, a )
 
 
 type alias Int2 =

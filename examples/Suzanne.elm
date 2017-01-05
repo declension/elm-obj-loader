@@ -20,7 +20,7 @@ import OBJ.Types exposing (Mesh(..))
 
 type alias Model =
     { time : Float
-    , mesh : Result String (Dict String Mesh)
+    , mesh : Result String (Dict String (Dict String Mesh))
     , zoom : Float
     , reflectionTexture : Result String GL.Texture
     }
@@ -38,7 +38,7 @@ main =
 
 type Msg
     = Tick Float
-    | LoadObj (Result String (Dict String Mesh))
+    | LoadObj (Result String (Dict String (Dict String Mesh)))
     | Zoom Float
     | TextureLoaded (Result String GL.Texture)
 
@@ -70,7 +70,6 @@ loadTexture url msg =
             )
 
 
-loadModel : String -> (Result String (Dict String Mesh) -> msg) -> Cmd msg
 loadModel url msg =
     Http.toTask (Http.getString url)
         |> Task.andThen
@@ -83,7 +82,12 @@ loadModel url msg =
             (\r ->
                 case r of
                     Ok (Ok m) ->
-                        msg (Ok m)
+                        let
+                            _ =
+                                Debug.log "r" m
+                        in
+                            -- msg (Err "blah!")
+                            msg (Ok m)
 
                     Ok (Err e) ->
                         msg (Err e)
@@ -106,15 +110,6 @@ renderModel { zoom, time } texture mesh =
             M4.mul view model
     in
         case mesh of
-            WithoutTexture { vertices, indices } ->
-                GL.renderWith [ depth depthOptions, cullFace front ]
-                    -- phongVert
-                    reflectionVert
-                    -- phongFrag
-                    reflectionFrag
-                    (GL.indexedTriangles vertices indices)
-                    { camera = camera, mvMat = modelView, texture = texture }
-
             WithTexture { vertices, indices } ->
                 GL.renderWith [ depth depthOptions, cullFace front ]
                     -- phongVert
@@ -123,6 +118,9 @@ renderModel { zoom, time } texture mesh =
                     reflectionFrag
                     (GL.indexedTriangles vertices indices)
                     { camera = camera, mvMat = modelView, texture = texture }
+
+            _ ->
+                Debug.crash "expected texture"
 
 
 getCamera : Float -> Float -> ( Mat4, Mat4 )
@@ -147,6 +145,7 @@ view model =
                     GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
                         [ onZoom, Attr.width 400, Attr.height 400 ]
                         (Dict.values m
+                            |> List.concatMap Dict.values
                             |> List.map (renderModel model t)
                         )
 
@@ -177,8 +176,8 @@ update msg model =
 -}
 phongVert =
     [glsl|
-attribute vec3 pos;
-attribute vec3 norm;
+attribute vec3 position;
+attribute vec3 normal;
 uniform mat4 mvMat;
 uniform mat3 nMat;
 uniform mat4 camera;
@@ -187,8 +186,8 @@ varying vec3 vNormal;
 
 void main()
 {
-    vec4 pos4 = mvMat * vec4(pos, 1.0);
-    vNormal = vec3(mvMat * vec4(norm, 0.0));
+    vec4 pos4 = mvMat * vec4(position, 1.0);
+    vNormal = vec3(mvMat * vec4(normal, 0.0));
 
     vVertex = vec3(pos4);
     gl_Position = camera * pos4;
@@ -251,16 +250,16 @@ Here are some relevant links:
 reflectionVert =
     [glsl|
 
-attribute vec3 pos;
-attribute vec3 norm;
+attribute vec3 position;
+attribute vec3 normal;
 uniform mat4 mvMat;
 uniform mat4 camera;
 varying vec3 vNormal;
 
 void main()
 {
-    vec4 vertex4 = mvMat * vec4(pos, 1.0);
-    vNormal = vec3(mvMat * vec4(norm, 0.0));
+    vec4 vertex4 = mvMat * vec4(position, 1.0);
+    vNormal = vec3(mvMat * vec4(normal, 0.0));
     vec3 nm_z = normalize(vec3(vertex4));
     vec3 nm_x = cross(nm_z, vec3(0.0, 1.0, 0.0));
     vec3 nm_y = cross(nm_x, nm_z);

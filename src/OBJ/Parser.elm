@@ -93,26 +93,42 @@ face =
 
 fVertex : Parser s Face
 fVertex =
-    (FVertex4 <$> (fourValues (,,,) int))
-        <|> (FVertex <$> (threeValues (,,) int))
+    FVertex <$> threeOrFourValues int
+
+
+
+-- (FVertex4 <$> (fourValues (,,,) int))
+--     <|> (FVertex <$> (threeValues (,,) int))
 
 
 fVertexTexture : Parser s Face
 fVertexTexture =
-    (FVertexTexture4 <$> (fourValues (,,,) int_int))
-        <|> (FVertexTexture <$> (threeValues (,,) int_int))
+    FVertexTexture <$> threeOrFourValues int_int
+
+
+
+-- (FVertexTexture4 <$> (fourValues (,,,) int_int))
+--     <|> (FVertexTexture <$> (threeValues (,,) int_int))
 
 
 fVertexTextureNormal : Parser s Face
 fVertexTextureNormal =
-    (FVertexTextureNormal4 <$> (fourValues (,,,) int_int_int))
-        <|> (FVertexTextureNormal <$> (threeValues (,,) int_int_int))
+    FVertexTextureNormal <$> threeOrFourValues int_int_int
+
+
+
+-- (FVertexTextureNormal4 <$> (fourValues (,,,) int_int_int))
+--     <|> (FVertexTextureNormal <$> (threeValues (,,) int_int_int))
 
 
 fVertexNormal : Parser s Face
 fVertexNormal =
-    (FVertexNormal4 <$> (fourValues (,,,) int__int))
-        <|> (FVertexNormal <$> (threeValues (,,) int__int))
+    FVertexNormal <$> threeOrFourValues int__int
+
+
+
+-- (FVertexNormal4 <$> (fourValues (,,,) int__int))
+--     <|> (FVertexNormal <$> (threeValues (,,) int__int))
 
 
 threeValues : (a -> a -> a -> b) -> Parser s a -> Parser s b
@@ -123,6 +139,12 @@ threeValues tagger vtype =
 fourValues : (a -> a -> a -> a -> b) -> Parser s a -> Parser s b
 fourValues tagger vtype =
     tagger <$> (vtype) <*> (spaces *> vtype) <*> (spaces *> vtype) <*> (spaces *> vtype)
+
+
+threeOrFourValues : Parser s a -> Parser s (ThreeOrFour a)
+threeOrFourValues elements =
+    (Four <$> (fourValues (,,,) elements))
+        <|> (Three <$> (threeValues (,,) elements))
 
 
 int_int : Parser s ( Int, Int )
