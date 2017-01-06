@@ -64,6 +64,8 @@ emptyCompileState =
     , vts = Array.empty
     , vns = Array.empty
     , currentIndex = 0
+    , knownVertexTextures = Dict.empty
+    , knownVertex = Dict.empty
     }
 
 
@@ -148,7 +150,14 @@ addCurrentMesh state =
     -- We can also normalize all values here that need normalizing
     case state.currentMesh of
         Just m ->
-            { state | currentGroup = Dict.insert state.currentMaterialName m state.currentGroup }
+            { state
+                | currentGroup = Dict.insert state.currentMaterialName m state.currentGroup
+                , currentMesh = Nothing
+                , knownVertexTextures =
+                    Dict.empty
+                    -- , knownVertexTexturesTangents = Dict.empty
+                , knownVertex = Dict.empty
+            }
 
         _ ->
             state
@@ -187,31 +196,54 @@ addFace f state =
 addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
     -- add a face to the mesh
     case ( f, mesh ) of
-        ( FTVertexTextureNormal ( ( vi1, ti1, ni1 ) as v1, ( vi2, ti2, ni2 ) as v2, ( vi3, ti3, ni3 ) as v3 ), WithTexture m ) ->
-            -- TODO: only add a new vertex if we don't know it already
+        ( FTVertexTextureNormal ( v1, v2, v3 ), WithTexture m ) ->
             let
-                i =
-                    currentIndex
-
-                ( ( p1, t1, n1 ), ( p2, t2, n2 ), ( p3, t3, n3 ) ) =
-                    ( unsafeGet3 ( vi1 - 1, ti1 - 1, ni1 - 1 ) vs vts vns
-                    , unsafeGet3 ( vi2 - 1, ti2 - 1, ni2 - 1 ) vs vts vns
-                    , unsafeGet3 ( vi3 - 1, ti3 - 1, ni3 - 1 ) vs vts vns
-                    )
-
-                newVs =
-                    [ VertexWithTexture p1 t1 n1, VertexWithTexture p2 t2 n2, VertexWithTexture p3 t3 n3 ]
-
-                newIs =
-                    ( i + 2, i + 1, i )
+                ( newState, newVs, newIs ) =
+                    applyForFace getOrInsertVTN ( v1, v2, v3 ) state
 
                 newMesh =
                     WithTexture { m | indices = newIs :: m.indices, vertices = m.vertices ++ newVs }
             in
-                { state | currentMesh = Just newMesh, currentIndex = i + 3 }
+                { newState | currentMesh = Just newMesh }
 
         _ ->
             Debug.crash "todo"
+
+
+applyForFace f ( i1, i2, i3 ) s_0 =
+    let
+        ( s_1, vs_1, i_1 ) =
+            f i1 s_0
+
+        ( s_2, vs_2, i_2 ) =
+            f i2 s_1
+
+        ( s_3, vs_3, i_3 ) =
+            f i3 s_2
+    in
+        ( s_3, vs_1 ++ vs_2 ++ vs_3, ( i_3, i_2, i_1 ) )
+
+
+getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as state) =
+    case Dict.get index knownVertexTextures of
+        Just i ->
+            ( state, [], i )
+
+        Nothing ->
+            let
+                ( p, t, n ) =
+                    unsafeGet3 index vs vts vns
+
+                v =
+                    VertexWithTexture p t n
+            in
+                ( { state
+                    | knownVertexTextures = Dict.insert index currentIndex knownVertexTextures
+                    , currentIndex = currentIndex + 1
+                  }
+                , [ v ]
+                , currentIndex
+                )
 
 
 getFaceNormal v1 v2 v3 =
@@ -326,9 +358,9 @@ log s a =
 
 unsafeGet3 : ( Int, Int, Int ) -> Array a -> Array b -> Array c -> ( a, b, c )
 unsafeGet3 ( a, b, c ) a1 a2 a3 =
-    case ( Array.get a a1, Array.get b a2, Array.get c a3 ) of
-        ( Just a, Just b, Just c ) ->
-            ( a, b, c )
+    case ( Array.get (a - 1) a1, Array.get (b - 1) a2, Array.get (c - 1) a3 ) of
+        ( Just a_, Just b_, Just c_ ) ->
+            ( a_, b_, c_ )
 
         _ ->
             Debug.crash "index out of bounds!"

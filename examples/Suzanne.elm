@@ -51,9 +51,17 @@ initModel =
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ loadModel "suzanne.obj" LoadObj
+        [ loadModel modelUrl LoadObj
         , loadTexture "chavant.jpg" TextureLoaded
         ]
+
+
+modelUrl =
+    -- "suzanne.obj"
+    -- "testObjs/elmLogoPositionandNormal.obj"
+    -- "testObjs/elmLogoPositionOnly.obj"
+    -- "testObjs/elmLogoPositionUVandNormal.obj"
+    "testObjs/elmLogoPositionUV.obj"
 
 
 loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
@@ -82,12 +90,7 @@ loadModel url msg =
             (\r ->
                 case r of
                     Ok (Ok m) ->
-                        let
-                            _ =
-                                Debug.log "r" m
-                        in
-                            -- msg (Err "blah!")
-                            msg (Ok m)
+                        msg (Ok m)
 
                     Ok (Err e) ->
                         msg (Err e)
