@@ -8,8 +8,7 @@ import OBJ.Types exposing (..)
 
 
 -- TODO:
--- To make things easier, I could just treat "g .." and "o .." the same way.
--- Or just ignore grouping and only group things if they use a different material.
+-- add support for calculating tangents
 
 
 compile lines =
@@ -17,11 +16,6 @@ compile lines =
         |> addCurrentMesh
         |> addCurrentGroup
         |> .groups
-
-
-
---        |> toMeshes
--- emptyCompileState : CompileState
 
 
 emptyCompileState =
@@ -59,9 +53,11 @@ and buils meshes on the fly.
 insertLine line state =
     case line of
         Object s ->
-            -- "o .."" statements are ignored,
-            -- because the specs doesn't give it any meaningful meaning.
-            state
+            -- even though the specs doesn't give it any meaningful meaning,
+            -- I treat is exactely like a group statement.
+            -- This is because blender uses o instead of g per default.
+            addCurrentGroup state
+                |> (\st -> { st | currentGroupName = s })
 
         MtlLib s ->
             -- MtlLib statements are ignored,
