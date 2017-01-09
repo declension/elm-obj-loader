@@ -12,8 +12,8 @@ import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Task
 import WebGL as GL
 import WebGL.Texture
-import WebGL.Options as GL
-import WebGL.Settings exposing (cullFace, depth, depthOptions, front)
+import WebGL.Settings exposing (cullFace, front)
+import WebGL.Settings.DepthTest as DepthTest
 import OBJ
 import OBJ.Types exposing (Mesh(..))
 
@@ -51,17 +51,9 @@ initModel =
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ loadModel modelUrl LoadObj
+        [ loadModel "suzanne.obj" LoadObj
         , loadTexture "chavant.jpg" TextureLoaded
         ]
-
-
-modelUrl =
-    -- "suzanne.obj"
-    -- "testObjs/elmLogoPositionandNormal.obj"
-    -- "testObjs/elmLogoPositionOnly.obj"
-    -- "testObjs/elmLogoPositionUVandNormal.obj"
-    "testObjs/elmLogoPositionUV.obj"
 
 
 loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
@@ -100,7 +92,7 @@ loadModel url msg =
             )
 
 
-renderModel : Model -> GL.Texture -> Mesh -> GL.Renderable
+renderModel : Model -> GL.Texture -> Mesh -> GL.Entity
 renderModel { zoom, time } texture mesh =
     let
         ( camera, view ) =
@@ -114,10 +106,8 @@ renderModel { zoom, time } texture mesh =
     in
         case mesh of
             WithTexture { vertices, indices } ->
-                GL.renderWith [ depth depthOptions, cullFace front ]
-                    -- phongVert
+                GL.entityWith [ DepthTest.default, cullFace front ]
                     reflectionVert
-                    -- phongFrag
                     reflectionFrag
                     (GL.indexedTriangles vertices indices)
                     { camera = camera, mvMat = modelView, texture = texture }
@@ -173,74 +163,6 @@ update msg model =
 
         TextureLoaded t ->
             ( { model | reflectionTexture = t }, Cmd.none )
-
-
-{-| A pretty standart phong shader.
--}
-phongVert =
-    [glsl|
-attribute vec3 position;
-attribute vec3 normal;
-uniform mat4 mvMat;
-uniform mat3 nMat;
-uniform mat4 camera;
-varying vec3 vVertex;
-varying vec3 vNormal;
-
-void main()
-{
-    vec4 pos4 = mvMat * vec4(position, 1.0);
-    vNormal = vec3(mvMat * vec4(normal, 0.0));
-
-    vVertex = vec3(pos4);
-    gl_Position = camera * pos4;
-}
-
-|]
-
-
-phongFrag =
-    [glsl|
-precision mediump float;
-
-varying vec3 vVertex;
-varying vec3 vNormal;
-const vec3 lightPos = 10.0*vec3(1.0, 5.0, 2.0);
-const vec3 specularColor = vec3(1.0,1.0,1.0);
-const vec3 ambientColor = vec3(0.2,0.1,0.1);
-const vec3 diffuseColor = vec3(0.8,0.8,1.0);
-
-
-const float shininessVal = 200.0;
-const float Ka=0.6, Kd=0.6, Ks=0.7;
-
-void main()
-{
-    vec3 fragColor = vec3(0.7, 0.7, 0.7);
-
-    vec3 N = normalize(vNormal);
-
-    vec3 L = normalize(lightPos - vVertex);
-
-    float lambertian = max(dot(N, L), 0.0);
-
-    float specular = 0.0;
-
-    if (lambertian > 0.0) {
-        vec3 R = reflect(-L, N);      // Reflected light vector
-        vec3 V = normalize(-vVertex); // Vector to viewer
-
-        // Compute the specular term
-        float specAngle = max(dot(R, V), 0.0);
-        specular = pow(specAngle, shininessVal);
-    }
-    gl_FragColor =
-        vec4(Ka * ambientColor +
-             Kd * lambertian * diffuseColor +
-             Ks * specular * specularColor, 1.0);
-}
-
-|]
 
 
 {-|

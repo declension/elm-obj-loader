@@ -2,9 +2,9 @@ module ElmLogo exposing (..)
 
 import AnimationFrame
 import Dict exposing (Dict)
-import Html
+import Html exposing (div, text)
 import Html.Attributes as Attr
-import Html.Events exposing (on)
+import Html.Events exposing (on, onInput)
 import Http
 import Json.Decode as JD
 import Math.Matrix4 as M4 exposing (Mat4)
@@ -12,8 +12,8 @@ import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Task
 import WebGL as GL
 import WebGL.Texture
-import WebGL.Options as GL
-import WebGL.Settings exposing (cullFace, depth, depthOptions, front)
+import WebGL.Settings exposing (cullFace, front)
+import WebGL.Settings.DepthTest as DepthTest
 import OBJ
 import OBJ.Types exposing (Mesh(..))
 import Mouse
@@ -22,7 +22,8 @@ import Window
 
 type alias Model =
     { time : Float
-    , mesh : Result String (Dict String Mesh)
+    , mesh : Result String (Dict String (Dict String Mesh))
+    , currentModel : String
     , zoom : Float
     , diffText : Result String GL.Texture
     , normText : Result String GL.Texture
@@ -65,7 +66,7 @@ subscriptions model =
 
 type Msg
     = Tick Float
-    | LoadObj (Result String (Dict String Mesh))
+    | LoadObj String (Result String (Dict String (Dict String Mesh)))
     | Zoom Float
     | MouseMove Mouse.Position
     | MouseDown Mouse.Position
@@ -73,11 +74,13 @@ type Msg
     | DiffTextureLoaded (Result String GL.Texture)
     | NormTextureLoaded (Result String GL.Texture)
     | ResizeWindow Window.Size
+    | SelectMesh String
 
 
 initModel : Model
 initModel =
     { mesh = Err "loading ..."
+    , currentModel = "elmLogo.obj"
     , time = 0
     , zoom = 5
     , diffText = Err "Loading texture..."
@@ -99,6 +102,21 @@ initCmd =
         ]
 
 
+models =
+    [ "elmLogo.obj"
+    , "suzanne.obj"
+    , "testObjs/elmLogoPositionandNormal.obj"
+    , "testObjs/elmLogoPositionOnly.obj"
+    , "testObjs/elmLogoPositionUVandNormal.obj" ++ {- OK -} ""
+    , "testObjs/elmLogoPositionUV.obj"
+    , "testObjs/elmLogoPositionUVTris.obj"
+    , "testObjs/testPositionandNormal.obj"
+    , "testObjs/testPositionOnly.obj"
+    , "testObjs/testPositionUVandNormal.obj" ++ {- OK -} ""
+    , "testObjs/testPositionUV.obj"
+    ]
+
+
 loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
 loadTexture url msg =
     WebGL.Texture.load url
@@ -113,7 +131,7 @@ loadTexture url msg =
             )
 
 
-loadModel : String -> (Result String (Dict String Mesh) -> msg) -> Cmd msg
+loadModel : String -> (String -> Result String (Dict String (Dict String Mesh)) -> msg) -> Cmd msg
 loadModel url msg =
     Http.toTask (Http.getString url)
         |> Task.andThen
@@ -126,17 +144,17 @@ loadModel url msg =
             (\r ->
                 case r of
                     Ok (Ok m) ->
-                        msg (Ok m)
+                        msg url (Ok m)
 
                     Ok (Err e) ->
-                        msg (Err e)
+                        msg url (Err e)
 
                     Err e ->
-                        msg (Err e)
+                        msg url (Err e)
             )
 
 
-renderModel : Model -> GL.Texture -> GL.Texture -> Mesh -> GL.Renderable
+renderModel : Model -> GL.Texture -> GL.Texture -> Mesh -> GL.Entity
 renderModel model textureDiff textureNorm mesh =
     let
         ( camera, view ) =
@@ -153,7 +171,25 @@ renderModel model textureDiff textureNorm mesh =
     in
         case mesh of
             WithTexture { vertices, indices } ->
-                GL.renderWith [ depth depthOptions, cullFace front ]
+                GL.entityWith [ DepthTest.default, cullFace front ]
+                    vert
+                    frag
+                    (GL.indexedTriangles vertices indices)
+                    { camera = camera
+                    , mvMat = modelView
+                    , textureDiff = textureDiff
+                    , textureNorm = textureNorm
+                    , time = model.time
+                    , light_diffuse = vec3 1.0 1.0 1.0
+                    , light_position = lightPos
+                    , light_specular = vec3 0.15 0.15 0.15
+                    , material_diffuse = vec3 0.5 0.5 0.5
+                    , material_specular = vec3 0.15 0.15 0.15
+                    , material_shininess = 100.002
+                    }
+
+            WithoutTexture { vertices, indices } ->
+                GL.entityWith [ DepthTest.default, cullFace front ]
                     vert
                     frag
                     (GL.indexedTriangles vertices indices)
@@ -171,7 +207,7 @@ renderModel model textureDiff textureNorm mesh =
                     }
 
             _ ->
-                Debug.crash "I was expecting a model with textures!"
+                Debug.crash "I wasn't expecting a model with tangents!"
 
 
 getCamera : Model -> ( Mat4, Mat4 )
@@ -184,7 +220,7 @@ getCamera { mouseDelta, zoom, windowSize } =
             toFloat windowSize.width / toFloat windowSize.height
     in
         ( (M4.makePerspective 45 (aspect) 0.01 10000)
-        , (M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my) (zoom * cos -mx * sin my)) (vec3 0 2 0) (vec3 0 1 0))
+        , (M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)) (vec3 0 1 0) (vec3 0 1 0))
         )
 
 
@@ -195,17 +231,27 @@ onZoom =
 
 view : Model -> Html.Html Msg
 view model =
-    --Html.div [] [ Html.text (toString model.mesh) ]
-    case ( model.mesh, model.diffText, model.normText ) of
-        ( Ok m, Ok td, Ok tn ) ->
-            GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
-                [ onZoom, Attr.width (model.windowSize.width - 10), Attr.height (model.windowSize.height - 10) ]
-                (Dict.values m
-                    |> List.map (renderModel model td tn)
-                )
+    div []
+        [ selectModel model
+        , case ( model.mesh, model.diffText, model.normText ) of
+            ( Ok m, Ok td, Ok tn ) ->
+                GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
+                    [ onZoom, Attr.width (model.windowSize.width - 10), Attr.height (model.windowSize.height - 10) ]
+                    (Dict.values m
+                        |> List.concatMap Dict.values
+                        |> List.map (renderModel model td tn)
+                    )
 
-        err ->
-            Html.div [] [ Html.text (toString err) ]
+            err ->
+                Html.div [] [ Html.text (toString err) ]
+        ]
+
+
+selectModel model =
+    div []
+        [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ] (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
+        , text model.currentModel
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -217,8 +263,11 @@ update msg model =
         Zoom dy ->
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
 
-        LoadObj mesh ->
-            ( { model | mesh = mesh }, Cmd.none )
+        SelectMesh m ->
+            ( model, loadModel m LoadObj )
+
+        LoadObj url mesh ->
+            ( { model | mesh = mesh, currentModel = url }, Cmd.none )
 
         DiffTextureLoaded t ->
             ( { model | diffText = t }, Cmd.none )
@@ -249,10 +298,10 @@ getDelta curr lastP delta =
 vert =
     [glsl|
 
-attribute vec3 pos;
-attribute vec3 norm;
-attribute vec2 coord;
-varying vec2 Vertex_UV;
+attribute vec3 position;
+attribute vec3 normal;
+//attribute vec2 texCoord;
+//varying vec2 Vertex_UV;
 varying vec3 Vertex_Normal;
 varying vec3 Vertex_LightDir;
 varying vec3 Vertex_EyeVec;
@@ -264,10 +313,10 @@ uniform vec3 light_position;
 
 void main()
 {
-    vec4 view_vertex = mvMat * vec4(pos, 1.0);
+    vec4 view_vertex = mvMat * vec4(position, 1.0);
     gl_Position = camera * view_vertex;
-    Vertex_UV = coord;
-    Vertex_Normal = (mvMat * vec4(norm, 1.0)).xyz;
+    //Vertex_UV = texCoord;
+    Vertex_Normal = normal; //(mvMat * vec4(normal, 1.0)).xyz; // TODO: WRONG! needs the normal matrix
     Vertex_LightDir = light_position - view_vertex.xyz;
     Vertex_EyeVec = -view_vertex.xyz;
 }
@@ -280,7 +329,6 @@ TODO: this shader is very wrong
 -}
 frag =
     [glsl|
-//__REPLACE_ME_WITH__(#extension GL_OES_standard_derivatives : enable)
 
 precision mediump float;
 
@@ -291,44 +339,14 @@ uniform vec3 material_diffuse;
 uniform vec3 light_specular;
 uniform vec3 material_specular;
 uniform float material_shininess;
-varying vec2 Vertex_UV;
+//varying vec2 Vertex_UV;
 varying vec3 Vertex_Normal;
 varying vec3 Vertex_LightDir;
 varying vec3 Vertex_EyeVec;
 
-// http://www.thetenthplanet.de/archives/1180
-mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
-{
-    // get edge vectors of the pixel triangle
-    vec3 dp1 = dFdx( p );
-    vec3 dp2 = dFdy( p );
-    vec2 duv1 = dFdx( uv );
-    vec2 duv2 = dFdy( uv );
-
-    // solve the linear system
-    vec3 dp2perp = cross( dp2, N );
-    vec3 dp1perp = cross( N, dp1 );
-    vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-    vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
-
-    // construct a scale-invariant frame
-    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-    return mat3( T * invmax, B * invmax, N );
-}
-
-vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord )
-{
-    // assume N, the interpolated vertex normal and
-    // V, the view vector (vertex to eye)
-    vec3 map = texture2D(textureNorm, texcoord ).xyz;
-    map = map * 255./127. - 128./127.;
-    mat3 TBN = cotangent_frame(N, -V, texcoord);
-    return normalize(TBN * map);
-}
-
 void main()
 {
-    vec2 uv = Vertex_UV;
+    /*vec2 uv = Vertex_UV;
 
     vec3 N = normalize(Vertex_Normal);
     vec3 L = normalize(Vertex_LightDir);
@@ -346,9 +364,9 @@ void main()
         vec3 R = reflect(-L, PN);
         float specular = pow( max(dot(R, E), 0.0), material_shininess);
         final_color += light_specular * material_specular * specular;
-    }
+    }*/
     //final_color = PN;
-    //final_color = N;
+    vec3 final_color = (Vertex_Normal + vec3(1.0))*0.5;
     gl_FragColor = vec4(final_color, 1.0);
 }
 

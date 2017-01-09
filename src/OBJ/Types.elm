@@ -2,6 +2,7 @@ module OBJ.Types exposing (..)
 
 import Math.Vector3 exposing (Vec3)
 import Math.Vector2 exposing (Vec2)
+import Array.Hamt as Array exposing (Array)
 
 
 type Mesh
@@ -10,8 +11,20 @@ type Mesh
     | WithTextureAndTangent (MeshWith VertexWithTextureAndTangent)
 
 
+type MeshT
+    = WithoutTextureT (MeshWith Vertex)
+    | WithTextureT (MeshWith VertexWithTexture)
+    | WithTextureAndTangentT (MeshWithT VertexWithTextureAndTangent)
+
+
 type alias MeshWith a =
     { vertices : List a
+    , indices : List Int3
+    }
+
+
+type alias MeshWithT a =
+    { vertices : Array a
     , indices : List Int3
     }
 
@@ -50,16 +63,12 @@ type
 
 
 type Face
-    = FVertex (ThreeOrFour Int)
-    | FVertexTexture (ThreeOrFour Int2)
-    | FVertexTextureNormal (ThreeOrFour Int3)
+    = FVertexTextureNormal (ThreeOrFour Int3)
     | FVertexNormal (ThreeOrFour Int2)
 
 
 type FaceTriangle
-    = FTVertex ( Int, Int, Int )
-    | FTVertexTexture ( Int2, Int2, Int2 )
-    | FTVertexTextureNormal ( Int3, Int3, Int3 )
+    = FTVertexTextureNormal ( Int3, Int3, Int3 )
     | FTVertexNormal ( Int2, Int2, Int2 )
 
 

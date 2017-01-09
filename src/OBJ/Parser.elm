@@ -8,6 +8,8 @@ import Combine.Char exposing (..)
 import OBJ.Types exposing (..)
 
 
+-- TODO: figure out how nice error messages work
+--
 -- The specs:
 --  http://www.martinreddy.net/gfx/3d/OBJ.spec
 
@@ -84,31 +86,23 @@ face : Parser s Face
 face =
     regex "f[ \t]+"
         *> choice
-            [ fVertex
-            , fVertexTexture
-            , fVertexTextureNormal
+            [ fVertexTextureNormal
             , fVertexNormal
+            , fVertex
+            , fVertexTexture
             ]
 
 
-fVertex : Parser s Face
+fVertex : Parser s a
 fVertex =
-    FVertex <$> threeOrFourValues int
+    threeOrFourValues int
+        *> fail "Models with no precalculated vertex normals are not supported!"
 
 
-
--- (FVertex4 <$> (fourValues (,,,) int))
---     <|> (FVertex <$> (threeValues (,,) int))
-
-
-fVertexTexture : Parser s Face
+fVertexTexture : Parser s a
 fVertexTexture =
-    FVertexTexture <$> threeOrFourValues int_int
-
-
-
--- (FVertexTexture4 <$> (fourValues (,,,) int_int))
---     <|> (FVertexTexture <$> (threeValues (,,) int_int))
+    threeOrFourValues int_int
+        *> fail "Models with no precalculated vertex normals are not supported!"
 
 
 fVertexTextureNormal : Parser s Face
@@ -116,19 +110,9 @@ fVertexTextureNormal =
     FVertexTextureNormal <$> threeOrFourValues int_int_int
 
 
-
--- (FVertexTextureNormal4 <$> (fourValues (,,,) int_int_int))
---     <|> (FVertexTextureNormal <$> (threeValues (,,) int_int_int))
-
-
 fVertexNormal : Parser s Face
 fVertexNormal =
     FVertexNormal <$> threeOrFourValues int__int
-
-
-
--- (FVertexNormal4 <$> (fourValues (,,,) int__int))
---     <|> (FVertexNormal <$> (threeValues (,,) int__int))
 
 
 threeValues : (a -> a -> a -> b) -> Parser s a -> Parser s b
