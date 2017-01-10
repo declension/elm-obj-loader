@@ -14,7 +14,7 @@ type Mesh
 type MeshT
     = WithoutTextureT (MeshWith Vertex)
     | WithTextureT (MeshWith VertexWithTexture)
-    | WithTextureAndTangentT (MeshWithT VertexWithTextureAndTangent)
+    | WithTextureAndTangentT (MeshWithT VertexWithTextureAndTangentT)
 
 
 type alias MeshWith a =
@@ -39,6 +39,10 @@ type alias VertexWithTexture =
 
 type alias VertexWithTextureAndTangent =
     { position : Vec3, texCoord : Vec2, normal : Vec3, tangent : Vec3 }
+
+
+type alias VertexWithTextureAndTangentT =
+    { position : Vec3, texCoord : Vec2, normal : Vec3, sdir : Vec3, tdir : Vec3 }
 
 
 type

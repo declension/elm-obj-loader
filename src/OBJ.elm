@@ -1,4 +1,4 @@
-module OBJ exposing (load)
+module OBJ exposing (load, loadWith)
 
 import Dict exposing (Dict)
 
@@ -10,6 +10,10 @@ import OBJ.Parser exposing (parse)
 import OBJ.Types exposing (Mesh)
 
 
-load input =
+loadWith config input =
     parse input
-        |> Result.map compile
+        |> Result.map (compile config)
+
+
+load =
+    loadWith { withTangents = False }

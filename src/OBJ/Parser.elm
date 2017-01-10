@@ -10,7 +10,7 @@ import OBJ.Types exposing (..)
 
 -- TODO: figure out how nice error messages work
 --
--- The specs:
+-- The obj specs:
 --  http://www.martinreddy.net/gfx/3d/OBJ.spec
 
 

@@ -2,7 +2,7 @@ module OBJ.Assembler exposing (..)
 
 import Array.Hamt as Array exposing (Array)
 import Dict exposing (Dict)
-import Math.Vector2 exposing (Vec2)
+import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import OBJ.Types exposing (..)
 
@@ -11,14 +11,14 @@ import OBJ.Types exposing (..)
 -- add support for calculating tangents
 
 
-compile lines =
-    compileHelper emptyCompileState lines
+compile config lines =
+    compileHelper (emptyCompileState config) lines
         |> addCurrentMesh
         |> addCurrentGroup
         |> .groups
 
 
-emptyCompileState =
+emptyCompileState config =
     { -- this is a Dict (GroupName/String) Group
       -- it's the final output of this algorithm
       --  Group = Dict (MtlName/String) Mesh
@@ -32,7 +32,9 @@ emptyCompileState =
     , vns = Array.empty
     , currentIndex = 0
     , knownVertexTextures = Dict.empty
+    , knownVertexTexturesTangents = Dict.empty
     , knownVertex = Dict.empty
+    , config = config
     }
 
 
@@ -111,9 +113,8 @@ addCurrentMesh state =
             { state
                 | currentGroup = Dict.insert state.currentMaterialName (finalizeMesh m) state.currentGroup
                 , currentMesh = Nothing
-                , knownVertexTextures =
-                    Dict.empty
-                    -- , knownVertexTexturesTangents = Dict.empty
+                , knownVertexTextures = Dict.empty
+                , knownVertexTexturesTangents = Dict.empty
                 , knownVertex = Dict.empty
             }
 
@@ -129,8 +130,25 @@ finalizeMesh mesh =
         WithoutTextureT m ->
             WithoutTexture m
 
-        _ ->
-            Debug.crash "TODO"
+        WithTextureAndTangentT m ->
+            WithTextureAndTangent
+                { m
+                    | vertices =
+                        Array.foldr
+                            (\({ position, texCoord, normal, sdir, tdir } as v) acc ->
+                                -- TODO: handedness!
+                                -- tangent[a].w = (Dot(Cross(n, t), tan2[a]) < 0.0F) ? -1.0F : 1.0F;
+                                -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
+                                { position = position
+                                , texCoord = texCoord
+                                , normal = normal
+                                , tangent = V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
+                                }
+                                    :: acc
+                            )
+                            []
+                            m.vertices
+                }
 
 
 addCurrentGroup state =
@@ -151,7 +169,7 @@ addFace f state =
     case state.currentMesh of
         Nothing ->
             -- we dont have a mesh yet, create one based on the type of the face
-            addFaceToMesh f (createMesh f) { state | currentIndex = 0 }
+            addFaceToMesh f (createMesh state.config.withTangents f) { state | currentIndex = 0 }
 
         Just m ->
             addFaceToMesh f m state
@@ -170,6 +188,19 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
             in
                 { newState | currentMesh = Just newMesh }
 
+        ( FTVertexTextureNormal ( v1, v2, v3 ), WithTextureAndTangentT m ) ->
+            let
+                tangents =
+                    getFaceTangent ( v1, v2, v3 ) state
+
+                ( newState, newVs, newIs ) =
+                    applyForFaceA (getOrInsertVTNT tangents) ( v1, v2, v3 ) state
+
+                newMesh =
+                    WithTextureAndTangentT { m | indices = newIs :: m.indices, vertices = Array.append m.vertices newVs }
+            in
+                { newState | currentMesh = Just newMesh }
+
         ( FTVertexNormal ( v1, v2, v3 ), WithoutTextureT m ) ->
             let
                 ( newState, newVs, newIs ) =
@@ -181,7 +212,7 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
                 { newState | currentMesh = Just newMesh }
 
         _ ->
-            Debug.crash "todo"
+            Debug.crash "mixed face types in the model!"
 
 
 applyForFace f ( i1, i2, i3 ) s_0 =
@@ -196,6 +227,55 @@ applyForFace f ( i1, i2, i3 ) s_0 =
             f i3 s_2
     in
         ( s_3, vs_1 ++ vs_2 ++ vs_3, ( i_3, i_2, i_1 ) )
+
+
+applyForFaceA f ( i1, i2, i3 ) s_0 =
+    let
+        ( s_1, vs_1, i_1 ) =
+            f i1 s_0
+
+        ( s_2, vs_2, i_2 ) =
+            f i2 s_1
+
+        ( s_3, vs_3, i_3 ) =
+            f i3 s_2
+    in
+        ( s_3, Array.append (Array.append vs_1 vs_2) vs_3, ( i_3, i_2, i_1 ) )
+
+
+getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as index) { vs, vts, vns } =
+    case ( get3 ( pi1, pi2, pi3 ) vs vs vs, get3 ( ti1, ti2, ti3 ) vts vts vts ) of
+        ( Just ( v1, v2, v3 ), Just ( w1, w2, w3 ) ) ->
+            let
+                ( ( v1x, v1y, v1z ), ( v2x, v2y, v2z ), ( v3x, v3y, v3z ) ) =
+                    t3map V3.toTuple ( v1, v2, v3 )
+
+                ( ( w1x, w1y ), ( w2x, w2y ), ( w3x, w3y ) ) =
+                    t3map V2.toTuple ( w1, w2, w3 )
+
+                ( ( x1, x2 ), ( y1, y2 ), ( z1, z2 ) ) =
+                    ( ( v2x - v1x, v3x - v1x )
+                    , ( v2y - v1y, v3y - v1y )
+                    , ( v2z - v1z, v3z - v1z )
+                    )
+
+                ( ( s1, s2 ), ( t1, t2 ) ) =
+                    ( ( w2x - w1x, w3x - w1x ), ( w2y - w1y, w3y - w1y ) )
+
+                r =
+                    1 / (s1 * t2 - s2 * t1)
+
+                sdir =
+                    vec3 ((t2 * x1 - t1 * x2) * r) ((t2 * y1 - t1 * y2) * r) ((t2 * z1 - t1 * z2) * r)
+
+                tdir =
+                    vec3 ((s1 * x2 - s2 * x1) * r) ((s1 * y2 - s2 * y1) * r) ((s1 * z2 - s2 * z1) * r)
+            in
+                ( sdir, tdir )
+
+        _ ->
+            ( vec3 1 1 1, vec3 1 1 1 )
+                |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
 
 getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as state) =
@@ -216,6 +296,49 @@ getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as sta
 
                 Nothing ->
                     ( state, [], -42 )
+                        |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
+
+
+getOrInsertVTNT ( s_dir, t_dir ) index ({ vs, vts, vns, knownVertexTexturesTangents, currentIndex } as state) =
+    case Dict.get index knownVertexTexturesTangents of
+        Just i ->
+            case state.currentMesh of
+                Just (WithTextureAndTangentT m) ->
+                    ( { state
+                        | currentMesh =
+                            Just
+                                (WithTextureAndTangentT
+                                    { m
+                                        | vertices =
+                                            updateArray i
+                                                (\({ sdir, tdir } as v) ->
+                                                    { v | sdir = V3.add sdir s_dir, tdir = V3.add tdir t_dir }
+                                                )
+                                                m.vertices
+                                    }
+                                )
+                      }
+                    , Array.empty
+                    , i
+                    )
+
+                _ ->
+                    -- should never happen
+                    ( state, Array.empty, i )
+
+        Nothing ->
+            case get3 index vs vts vns of
+                Just ( p, t, n ) ->
+                    ( { state
+                        | knownVertexTexturesTangents = Dict.insert index currentIndex knownVertexTexturesTangents
+                        , currentIndex = currentIndex + 1
+                      }
+                    , Array.fromList [ VertexWithTextureAndTangentT p t n s_dir t_dir ]
+                    , currentIndex
+                    )
+
+                Nothing ->
+                    ( state, Array.empty, -42 )
                         |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
 
@@ -262,7 +385,7 @@ triangulate threeOrFour =
             [ ( a, b, c ), ( d, a, c ) ]
 
 
-createMesh f =
+createMesh withTangents f =
     let
         emptyMesh =
             { vertices = [], indices = [] }
@@ -270,7 +393,10 @@ createMesh f =
         case f of
             FTVertexTextureNormal _ ->
                 -- TODO: if with or without tangent should depend on the user config
-                WithTextureT emptyMesh
+                if withTangents then
+                    WithTextureAndTangentT { emptyMesh | vertices = Array.empty }
+                else
+                    WithTextureT emptyMesh
 
             FTVertexNormal _ ->
                 WithoutTextureT emptyMesh
@@ -288,6 +414,19 @@ log s a =
             Debug.log s ()
     in
         a
+
+
+t3map f ( a, b, c ) =
+    ( f a, f b, f c )
+
+
+updateArray i f a =
+    case Array.get i a of
+        Just v ->
+            Array.set i (f v) a
+
+        Nothing ->
+            a
 
 
 get3 ( a, b, c ) a1 a2 a3 =

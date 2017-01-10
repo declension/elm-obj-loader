@@ -4,7 +4,7 @@ import AnimationFrame
 import Dict exposing (Dict)
 import Html exposing (div, text)
 import Html.Attributes as Attr
-import Html.Events exposing (on, onInput)
+import Html.Events exposing (on, onInput, onCheck)
 import Http
 import Json.Decode as JD
 import Math.Matrix4 as M4 exposing (Mat4)
@@ -31,6 +31,7 @@ type alias Model =
     , lastMousePos : Mouse.Position
     , mouseDelta : MouseDelta
     , windowSize : Window.Size
+    , withTangent : Bool
     }
 
 
@@ -75,6 +76,7 @@ type Msg
     | NormTextureLoaded (Result String GL.Texture)
     | ResizeWindow Window.Size
     | SelectMesh String
+    | SetUseTangent Bool
 
 
 initModel : Model
@@ -89,13 +91,14 @@ initModel =
     , lastMousePos = Mouse.Position 0 0
     , mouseDelta = MouseDelta 0 (pi / 2)
     , windowSize = Window.Size 800 600
+    , withTangent = False
     }
 
 
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ loadModel "elmLogo.obj" LoadObj
+        [ loadModel False "elmLogo.obj" LoadObj
         , loadTexture "elmLogoDiffuse.png" DiffTextureLoaded
         , loadTexture "elmLogoNorm.png" NormTextureLoaded
         , Task.perform ResizeWindow Window.size
@@ -131,12 +134,12 @@ loadTexture url msg =
             )
 
 
-loadModel : String -> (String -> Result String (Dict String (Dict String Mesh)) -> msg) -> Cmd msg
-loadModel url msg =
+loadModel : Bool -> String -> (String -> Result String (Dict String (Dict String Mesh)) -> msg) -> Cmd msg
+loadModel withTangent url msg =
     Http.toTask (Http.getString url)
         |> Task.andThen
             (\s ->
-                OBJ.load s
+                OBJ.loadWith { withTangents = withTangent } s
                     |> Task.succeed
             )
         |> Task.onError (\e -> Task.succeed (Err ("failed to load: " ++ toString e)))
@@ -165,6 +168,11 @@ renderModel model textureDiff textureNorm mesh =
 
         modelView =
             M4.mul view modelM
+
+        normalMat =
+            -- this is not generally correct, but in this example it works.
+            -- http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
+            modelM
 
         lightPos =
             M4.transform view (vec3 -2 (cos model.time) (sin model.time))
@@ -206,8 +214,25 @@ renderModel model textureDiff textureNorm mesh =
                     , material_shininess = 100.002
                     }
 
-            _ ->
-                Debug.crash "I wasn't expecting a model with tangents!"
+            WithTextureAndTangent { vertices, indices } ->
+                GL.entityWith [ DepthTest.default, cullFace front ]
+                    normalVert
+                    normalFrag
+                    (GL.indexedTriangles vertices indices)
+                    { camera = camera
+                    , mvMat = modelView
+                    , viewMat = view
+                    , normalMat = normalMat
+                    , textureDiff = textureDiff
+                    , textureNorm = textureNorm
+                    , time = model.time
+                    , light_diffuse = vec3 1.0 1.0 1.0
+                    , light_position = lightPos
+                    , light_specular = vec3 0.15 0.15 0.15
+                    , material_diffuse = vec3 0.5 0.5 0.5
+                    , material_specular = vec3 0.15 0.15 0.15
+                    , material_shininess = 100.002
+                    }
 
 
 getCamera : Model -> ( Mat4, Mat4 )
@@ -250,6 +275,7 @@ view model =
 selectModel model =
     div []
         [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ] (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
+        , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent ] []
         , text model.currentModel
         ]
 
@@ -264,7 +290,10 @@ update msg model =
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
 
         SelectMesh m ->
-            ( model, loadModel m LoadObj )
+            ( model, loadModel model.withTangent m LoadObj )
+
+        SetUseTangent t ->
+            ( { model | withTangent = t }, loadModel t model.currentModel LoadObj )
 
         LoadObj url mesh ->
             ( { model | mesh = mesh, currentModel = url }, Cmd.none )
@@ -367,6 +396,81 @@ void main()
     }*/
     //final_color = PN;
     vec3 final_color = (Vertex_Normal + vec3(1.0))*0.5;
+    gl_FragColor = vec4(final_color, 1.0);
+}
+
+|]
+
+
+normalVert =
+    [glsl|
+
+attribute vec3 position;
+attribute vec3 normal;
+attribute vec2 texCoord;
+attribute vec3 tangent;
+
+varying vec2 Vertex_UV;
+varying vec3 Vertex_LightDir;
+varying vec3 Vertex_EyeVec;
+
+uniform mat4 camera;
+uniform mat4 mvMat;
+uniform mat4 viewMat;
+uniform mat4 normalMat;
+
+uniform vec3 light_position;
+
+mat3 transpose(mat3 m) {
+  return mat3(m[0][0], m[1][0], m[2][0],
+              m[0][1], m[1][1], m[2][1],
+              m[0][2], m[1][2], m[2][2]);
+}
+
+void main()
+{
+    vec4 view_vertex = mvMat * vec4(position, 1.0);
+    gl_Position = camera * view_vertex;
+
+    Vertex_UV = texCoord;
+
+    // Tangent, Bitangent, Normal space matrix TBN
+    vec3 T = normalize(vec3(normalMat * vec4(tangent, 0.0)));
+    vec3 N = normalize(vec3(normalMat * vec4(normal, 0.0)));
+    vec3 B = cross(T, N);
+    mat3 TBN_inv = transpose(mat3(T, B, N));
+
+    vec3 lightDir = (vec4(light_position, 1.0) - view_vertex).xyz;
+    Vertex_LightDir = TBN_inv * lightDir;
+    Vertex_EyeVec =  TBN_inv * -view_vertex.xyz;
+}
+
+|]
+
+
+normalFrag =
+    [glsl|
+
+precision mediump float;
+
+uniform sampler2D textureDiff; // color map
+uniform sampler2D textureNorm; // normal map
+uniform vec3 light_diffuse;
+uniform vec3 material_diffuse;
+uniform vec3 light_specular;
+uniform vec3 material_specular;
+uniform float material_shininess;
+varying vec2 Vertex_UV;
+varying vec3 Vertex_LightDir;
+varying vec3 Vertex_EyeVec;
+
+void main()
+{
+    // Local normal, in tangent space
+    vec3 normal = normalize(texture2D(textureNorm, Vertex_UV).rgb*2.0 - 1.0);
+    float diff = clamp( dot( normal,Vertex_LightDir ), 0.0,1.0 );
+    vec3 color = texture2D(textureDiff, Vertex_UV).rgb;
+    vec3 final_color = color * diff;
     gl_FragColor = vec4(final_color, 1.0);
 }
 
