@@ -1,6 +1,7 @@
 module OBJ.Types exposing (..)
 
 import Math.Vector3 exposing (Vec3)
+import Math.Vector4 exposing (Vec4)
 import Math.Vector2 exposing (Vec2)
 import Array.Hamt as Array exposing (Array)
 
@@ -38,7 +39,7 @@ type alias VertexWithTexture =
 
 
 type alias VertexWithTextureAndTangent =
-    { position : Vec3, texCoord : Vec2, normal : Vec3, tangent : Vec3 }
+    { position : Vec3, texCoord : Vec2, normal : Vec3, tangent : Vec4 }
 
 
 type alias VertexWithTextureAndTangentT =

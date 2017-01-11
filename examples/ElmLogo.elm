@@ -160,82 +160,56 @@ loadModel withTangent url msg =
 renderModel : Model -> GL.Texture -> GL.Texture -> Mesh -> GL.Entity
 renderModel model textureDiff textureNorm mesh =
     let
-        ( camera, view ) =
+        ( camera, view, viewProjection ) =
             getCamera model
 
         modelM =
             M4.makeTranslate (vec3 -1 0 0)
 
-        modelView =
-            M4.mul view modelM
-
-        normalMat =
-            -- this is not generally correct, but in this example it works.
-            -- http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
-            modelM
-
         lightPos =
-            M4.transform view (vec3 -2 (cos model.time) (sin model.time))
+            vec3 (0.5 * cos (2 * model.time)) (1 + 0.5 * sin (2 * model.time)) 0.5
+
+        uniforms =
+            { camera = camera
+            , mvMat = M4.mul view modelM
+            , modelViewProjectionMatrix = M4.mul viewProjection modelM
+            , modelMatrix = modelM
+            , normalMat =
+                -- this is not generally correct, but in this example it works.
+                -- http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
+                M4.identity
+            , viewMat = view
+            , textureDiff = textureDiff
+            , textureNorm = textureNorm
+            , time = model.time
+            , light_diffuse = vec3 1.0 1.0 1.0
+            , lightPosition = lightPos
+            , light_specular = vec3 0.15 0.15 0.15
+            , material_diffuse = vec3 0.5 0.5 0.5
+            , material_specular = vec3 0.15 0.15 0.15
+            , material_shininess = 100.002
+            }
     in
         case mesh of
             WithTexture { vertices, indices } ->
-                GL.entityWith [ DepthTest.default, cullFace front ]
-                    vert
-                    frag
-                    (GL.indexedTriangles vertices indices)
-                    { camera = camera
-                    , mvMat = modelView
-                    , textureDiff = textureDiff
-                    , textureNorm = textureNorm
-                    , time = model.time
-                    , light_diffuse = vec3 1.0 1.0 1.0
-                    , light_position = lightPos
-                    , light_specular = vec3 0.15 0.15 0.15
-                    , material_diffuse = vec3 0.5 0.5 0.5
-                    , material_specular = vec3 0.15 0.15 0.15
-                    , material_shininess = 100.002
-                    }
+                renderCullFace vert frag (GL.indexedTriangles vertices indices) uniforms
 
             WithoutTexture { vertices, indices } ->
-                GL.entityWith [ DepthTest.default, cullFace front ]
-                    vert
-                    frag
-                    (GL.indexedTriangles vertices indices)
-                    { camera = camera
-                    , mvMat = modelView
-                    , textureDiff = textureDiff
-                    , textureNorm = textureNorm
-                    , time = model.time
-                    , light_diffuse = vec3 1.0 1.0 1.0
-                    , light_position = lightPos
-                    , light_specular = vec3 0.15 0.15 0.15
-                    , material_diffuse = vec3 0.5 0.5 0.5
-                    , material_specular = vec3 0.15 0.15 0.15
-                    , material_shininess = 100.002
-                    }
+                renderCullFace vert frag (GL.indexedTriangles vertices indices) uniforms
 
             WithTextureAndTangent { vertices, indices } ->
-                GL.entityWith [ DepthTest.default, cullFace front ]
-                    normalVert
-                    normalFrag
-                    (GL.indexedTriangles vertices indices)
-                    { camera = camera
-                    , mvMat = modelView
-                    , viewMat = view
-                    , normalMat = normalMat
-                    , textureDiff = textureDiff
-                    , textureNorm = textureNorm
-                    , time = model.time
-                    , light_diffuse = vec3 1.0 1.0 1.0
-                    , light_position = lightPos
-                    , light_specular = vec3 0.15 0.15 0.15
-                    , material_diffuse = vec3 0.5 0.5 0.5
-                    , material_specular = vec3 0.15 0.15 0.15
-                    , material_shininess = 100.002
-                    }
+                renderCullFace normalVert normalFrag (GL.indexedTriangles vertices indices) uniforms
 
 
-getCamera : Model -> ( Mat4, Mat4 )
+renderLight viewProjection pos =
+    GL.entity lightVert lightFrag (GL.points [ { position = pos } ]) { viewProjectionMatrix = viewProjection }
+
+
+renderCullFace =
+    GL.entityWith [ DepthTest.default, cullFace front ]
+
+
+getCamera : Model -> ( Mat4, Mat4, Mat4 )
 getCamera { mouseDelta, zoom, windowSize } =
     let
         ( mx, my ) =
@@ -243,10 +217,14 @@ getCamera { mouseDelta, zoom, windowSize } =
 
         aspect =
             toFloat windowSize.width / toFloat windowSize.height
+
+        proj =
+            M4.makePerspective 45 aspect 0.01 10000
+
+        view =
+            M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)) (vec3 0 1 0) (vec3 0 1 0)
     in
-        ( (M4.makePerspective 45 (aspect) 0.01 10000)
-        , (M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)) (vec3 0 1 0) (vec3 0 1 0))
-        )
+        ( proj, view, M4.mul proj view )
 
 
 onZoom : Html.Attribute Msg
@@ -275,6 +253,7 @@ view model =
 selectModel model =
     div []
         [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ] (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
+        , text "\twith normal map: "
         , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent ] []
         , text model.currentModel
         ]
@@ -330,23 +309,23 @@ vert =
 attribute vec3 position;
 attribute vec3 normal;
 //attribute vec2 texCoord;
-//varying vec2 Vertex_UV;
+//varying vec2 vTexCoord;
 varying vec3 Vertex_Normal;
-varying vec3 Vertex_LightDir;
+varying vec3 vLightDirection;
 varying vec3 Vertex_EyeVec;
 
 uniform mat4 camera;
 uniform mat4 mvMat;
 
-uniform vec3 light_position;
+uniform vec3 lightPosition;
 
 void main()
 {
     vec4 view_vertex = mvMat * vec4(position, 1.0);
     gl_Position = camera * view_vertex;
-    //Vertex_UV = texCoord;
+    //vTexCoord = texCoord;
     Vertex_Normal = normal; //(mvMat * vec4(normal, 1.0)).xyz; // TODO: WRONG! needs the normal matrix
-    Vertex_LightDir = light_position - view_vertex.xyz;
+    vLightDirection = lightPosition - view_vertex.xyz;
     Vertex_EyeVec = -view_vertex.xyz;
 }
 
@@ -358,7 +337,6 @@ TODO: this shader is very wrong
 -}
 frag =
     [glsl|
-
 precision mediump float;
 
 uniform sampler2D textureDiff; // color map
@@ -368,17 +346,17 @@ uniform vec3 material_diffuse;
 uniform vec3 light_specular;
 uniform vec3 material_specular;
 uniform float material_shininess;
-//varying vec2 Vertex_UV;
+//varying vec2 vTexCoord;
 varying vec3 Vertex_Normal;
-varying vec3 Vertex_LightDir;
+varying vec3 vLightDirection;
 varying vec3 Vertex_EyeVec;
 
 void main()
 {
-    /*vec2 uv = Vertex_UV;
+    /*vec2 uv = vTexCoord;
 
     vec3 N = normalize(Vertex_Normal);
-    vec3 L = normalize(Vertex_LightDir);
+    vec3 L = normalize(vLightDirection);
     vec3 V = normalize(Vertex_EyeVec);
     vec3 PN = perturb_normal(N, V, uv);
 
@@ -398,59 +376,45 @@ void main()
     vec3 final_color = (Vertex_Normal + vec3(1.0))*0.5;
     gl_FragColor = vec4(final_color, 1.0);
 }
-
 |]
 
 
 normalVert =
     [glsl|
-
 attribute vec3 position;
 attribute vec3 normal;
 attribute vec2 texCoord;
-attribute vec3 tangent;
+attribute vec4 tangent;
 
-varying vec2 Vertex_UV;
-varying vec3 Vertex_LightDir;
-varying vec3 Vertex_EyeVec;
+varying vec2 vTexCoord;
+varying vec3 vLightDirection;
+varying mat3 tbn;
 
-uniform mat4 camera;
-uniform mat4 mvMat;
-uniform mat4 viewMat;
-uniform mat4 normalMat;
-
-uniform vec3 light_position;
-
-mat3 transpose(mat3 m) {
-  return mat3(m[0][0], m[1][0], m[2][0],
-              m[0][1], m[1][1], m[2][1],
-              m[0][2], m[1][2], m[2][2]);
-}
+uniform mat4 modelViewProjectionMatrix;
+uniform mat4 modelMatrix;
+uniform vec3 lightPosition;
 
 void main()
 {
-    vec4 view_vertex = mvMat * vec4(position, 1.0);
-    gl_Position = camera * view_vertex;
-
-    Vertex_UV = texCoord;
+    vec4 pos = vec4(position, 1.0 );
+    vec3 posWorld = (modelMatrix * pos).xyz;
 
     // Tangent, Bitangent, Normal space matrix TBN
-    vec3 T = normalize(vec3(normalMat * vec4(tangent, 0.0)));
-    vec3 N = normalize(vec3(normalMat * vec4(normal, 0.0)));
-    vec3 B = cross(T, N);
-    mat3 TBN_inv = transpose(mat3(T, B, N));
+    // this isn't entirely correct, it should use the normal matrix
+    vec3 n = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    vec3 t = normalize((modelMatrix * vec4(tangent.xyz, 0.0)).xyz);
+    vec3 b = normalize((modelMatrix * vec4((cross(normal, tangent.xyz) * tangent.w), 0.0)).xyz);
+    tbn = mat3(t, b, n);
+    vLightDirection = lightPosition - posWorld;
 
-    vec3 lightDir = (vec4(light_position, 1.0) - view_vertex).xyz;
-    Vertex_LightDir = TBN_inv * lightDir;
-    Vertex_EyeVec =  TBN_inv * -view_vertex.xyz;
+    vTexCoord = texCoord;
+    gl_Position = modelViewProjectionMatrix * pos;
 }
-
 |]
 
 
 normalFrag =
     [glsl|
-
 precision mediump float;
 
 uniform sampler2D textureDiff; // color map
@@ -460,18 +424,40 @@ uniform vec3 material_diffuse;
 uniform vec3 light_specular;
 uniform vec3 material_specular;
 uniform float material_shininess;
-varying vec2 Vertex_UV;
-varying vec3 Vertex_LightDir;
-varying vec3 Vertex_EyeVec;
 
-void main()
-{
+varying vec2 vTexCoord;
+varying vec3 vLightDirection;
+varying mat3 tbn;
+
+void main() {
     // Local normal, in tangent space
-    vec3 normal = normalize(texture2D(textureNorm, Vertex_UV).rgb*2.0 - 1.0);
-    float diff = clamp( dot( normal,Vertex_LightDir ), 0.0,1.0 );
-    vec3 color = texture2D(textureDiff, Vertex_UV).rgb;
-    vec3 final_color = color * diff;
+    vec3 pixelNormal = tbn * normalize(texture2D(textureNorm, vTexCoord).rgb*2.0 - 1.0);
+    float lambert = max(dot(pixelNormal, normalize(vLightDirection)), 0.0);
+
+    vec3 diffuse = texture2D(textureDiff, vTexCoord).rgb;
+    vec3 final_color = diffuse * lambert;
     gl_FragColor = vec4(final_color, 1.0);
 }
+|]
 
+
+lightVert =
+    [glsl|
+attribute vec3 position;
+uniform mat4 viewProjectionMatrix;
+
+void main(void) {
+    gl_PointSize = 20.0;
+    gl_Position = vec4((viewProjectionMatrix * vec4(position, 1.0)).xyz, 1.0);
+}
+|]
+
+
+lightFrag =
+    [glsl|
+precision mediump float;
+
+void main(void) {
+    gl_FragColor = vec4(1.0, 0.5, 0.0, 1.0);
+}
 |]

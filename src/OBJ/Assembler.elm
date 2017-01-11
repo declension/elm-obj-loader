@@ -4,6 +4,7 @@ import Array.Hamt as Array exposing (Array)
 import Dict exposing (Dict)
 import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
+import Math.Vector4 as V4 exposing (Vec4, vec4)
 import OBJ.Types exposing (..)
 
 
@@ -136,15 +137,28 @@ finalizeMesh mesh =
                     | vertices =
                         Array.foldr
                             (\({ position, texCoord, normal, sdir, tdir } as v) acc ->
-                                -- TODO: handedness!
-                                -- tangent[a].w = (Dot(Cross(n, t), tan2[a]) < 0.0F) ? -1.0F : 1.0F;
-                                -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
-                                { position = position
-                                , texCoord = texCoord
-                                , normal = normal
-                                , tangent = V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
-                                }
-                                    :: acc
+                                let
+                                    -- handedness:
+                                    -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
+                                    w =
+                                        if V3.dot (V3.cross normal sdir) tdir < 0 then
+                                            -1
+                                        else
+                                            1
+
+                                    ( x, y, z ) =
+                                        -- I have not seen this anywhere, but I added it because I sometimes got (0,0,0)
+                                        if V3.lengthSquared sdir /= 0 then
+                                            V3.toTuple <| V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
+                                        else
+                                            V3.toTuple <| V3.cross (V3.normalize (V3.sub tdir (V3.scale (V3.dot normal tdir) normal))) normal
+                                in
+                                    { position = position
+                                    , texCoord = texCoord
+                                    , normal = normal
+                                    , tangent = vec4 x y z w
+                                    }
+                                        :: acc
                             )
                             []
                             m.vertices
@@ -262,8 +276,14 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
                 ( ( s1, s2 ), ( t1, t2 ) ) =
                     ( ( w2x - w1x, w3x - w1x ), ( w2y - w1y, w3y - w1y ) )
 
+                denom =
+                    s1 * t2 - s2 * t1
+
                 r =
-                    1 / (s1 * t2 - s2 * t1)
+                    if abs denom <= 0.000001 then
+                        0.1
+                    else
+                        1 / denom
 
                 sdir =
                     vec3 ((t2 * x1 - t1 * x2) * r) ((t2 * y1 - t1 * y2) * r) ((t2 * z1 - t1 * z2) * r)
