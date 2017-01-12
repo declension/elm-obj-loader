@@ -98,7 +98,7 @@ initModel =
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ loadModel False "elmLogo.obj" LoadObj
+        [ OBJ.loadObjFileWith { withTangents = False } "elmLogo.obj" LoadObj
         , loadTexture "elmLogoDiffuse.png" DiffTextureLoaded
         , loadTexture "elmLogoNorm.png" NormTextureLoaded
         , Task.perform ResizeWindow Window.size
@@ -108,6 +108,7 @@ initCmd =
 models =
     [ "elmLogo.obj"
     , "suzanne.obj"
+    , "testObjs/nanoSuit.obj"
     , "testObjs/elmLogoPositionandNormal.obj"
     , "testObjs/elmLogoPositionOnly.obj"
     , "testObjs/elmLogoPositionUVandNormal.obj" ++ {- OK -} ""
@@ -134,33 +135,10 @@ loadTexture url msg =
             )
 
 
-loadModel : Bool -> String -> (String -> Result String (Dict String (Dict String Mesh)) -> msg) -> Cmd msg
-loadModel withTangent url msg =
-    Http.toTask (Http.getString url)
-        |> Task.andThen
-            (\s ->
-                OBJ.loadWith { withTangents = withTangent } s
-                    |> Task.succeed
-            )
-        |> Task.onError (\e -> Task.succeed (Err ("failed to load: " ++ toString e)))
-        |> Task.attempt
-            (\r ->
-                case r of
-                    Ok (Ok m) ->
-                        msg url (Ok m)
-
-                    Ok (Err e) ->
-                        msg url (Err e)
-
-                    Err e ->
-                        msg url (Err e)
-            )
-
-
 renderModel : Model -> GL.Texture -> GL.Texture -> Mesh -> GL.Entity
 renderModel model textureDiff textureNorm mesh =
     let
-        ( camera, view, viewProjection ) =
+        ( camera, view, viewProjection, cameraPos ) =
             getCamera model
 
         modelM =
@@ -179,6 +157,7 @@ renderModel model textureDiff textureNorm mesh =
                 -- http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
                 M4.identity
             , viewMat = view
+            , viewPosition = cameraPos
             , textureDiff = textureDiff
             , textureNorm = textureNorm
             , time = model.time
@@ -201,15 +180,11 @@ renderModel model textureDiff textureNorm mesh =
                 renderCullFace normalVert normalFrag (GL.indexedTriangles vertices indices) uniforms
 
 
-renderLight viewProjection pos =
-    GL.entity lightVert lightFrag (GL.points [ { position = pos } ]) { viewProjectionMatrix = viewProjection }
-
-
 renderCullFace =
     GL.entityWith [ DepthTest.default, cullFace front ]
 
 
-getCamera : Model -> ( Mat4, Mat4, Mat4 )
+getCamera : Model -> ( Mat4, Mat4, Mat4, Vec3 )
 getCamera { mouseDelta, zoom, windowSize } =
     let
         ( mx, my ) =
@@ -221,10 +196,13 @@ getCamera { mouseDelta, zoom, windowSize } =
         proj =
             M4.makePerspective 45 aspect 0.01 10000
 
+        position =
+            vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)
+
         view =
-            M4.makeLookAt (vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)) (vec3 0 1 0) (vec3 0 1 0)
+            M4.makeLookAt (position) (vec3 0 1 0) (vec3 0 1 0)
     in
-        ( proj, view, M4.mul proj view )
+        ( proj, view, M4.mul proj view, position )
 
 
 onZoom : Html.Attribute Msg
@@ -239,7 +217,11 @@ view model =
         , case ( model.mesh, model.diffText, model.normText ) of
             ( Ok m, Ok td, Ok tn ) ->
                 GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
-                    [ onZoom, Attr.width (model.windowSize.width - 10), Attr.height (model.windowSize.height - 10) ]
+                    [ onZoom
+                    , Attr.width (model.windowSize.width)
+                    , Attr.height (model.windowSize.height)
+                    , Attr.style [ ( "position", "absolute" ) ]
+                    ]
                     (Dict.values m
                         |> List.concatMap Dict.values
                         |> List.map (renderModel model td tn)
@@ -251,7 +233,7 @@ view model =
 
 
 selectModel model =
-    div []
+    div [ Attr.style [ ( "position", "absolute" ), ( "z-index", "2" ), ( "backgroundColor", "white" ) ] ]
         [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ] (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
         , text "\twith normal map: "
         , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent ] []
@@ -269,10 +251,10 @@ update msg model =
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
 
         SelectMesh m ->
-            ( model, loadModel model.withTangent m LoadObj )
+            ( model, OBJ.loadObjFileWith { withTangents = model.withTangent } m LoadObj )
 
         SetUseTangent t ->
-            ( { model | withTangent = t }, loadModel t model.currentModel LoadObj )
+            ( { model | withTangent = t }, OBJ.loadObjFileWith { withTangents = t } model.currentModel LoadObj )
 
         LoadObj url mesh ->
             ( { model | mesh = mesh, currentModel = url }, Cmd.none )
@@ -379,6 +361,9 @@ void main()
 |]
 
 
+{-| normal mapping according to:
+http://www.gamasutra.com/blogs/RobertBasler/20131122/205462/Three_Normal_Mapping_Techniques_Explained_For_the_Mathematically_Uninclined.php?print=1
+-}
 normalVert =
     [glsl|
 attribute vec3 position;
@@ -388,11 +373,20 @@ attribute vec4 tangent;
 
 varying vec2 vTexCoord;
 varying vec3 vLightDirection;
-varying mat3 tbn;
+varying vec3 vViewDirection;
+
 
 uniform mat4 modelViewProjectionMatrix;
 uniform mat4 modelMatrix;
 uniform vec3 lightPosition;
+uniform vec3 viewPosition;
+
+mat3 transpose(mat3 m) {
+    return mat3(m[0][0], m[1][0], m[2][0],
+                m[0][1], m[1][1], m[2][1],
+                m[0][2], m[1][2], m[2][2]);
+}
+
 
 void main()
 {
@@ -404,9 +398,9 @@ void main()
     vec3 n = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     vec3 t = normalize((modelMatrix * vec4(tangent.xyz, 0.0)).xyz);
     vec3 b = normalize((modelMatrix * vec4((cross(normal, tangent.xyz) * tangent.w), 0.0)).xyz);
-    tbn = mat3(t, b, n);
-    vLightDirection = lightPosition - posWorld;
-
+    mat3 tbn = transpose(mat3(t, b, n));
+    vLightDirection = tbn*(lightPosition - posWorld);
+    vViewDirection = tbn*(viewPosition - posWorld);
     vTexCoord = texCoord;
     gl_Position = modelViewProjectionMatrix * pos;
 }
@@ -417,47 +411,36 @@ normalFrag =
     [glsl|
 precision mediump float;
 
-uniform sampler2D textureDiff; // color map
-uniform sampler2D textureNorm; // normal map
-uniform vec3 light_diffuse;
-uniform vec3 material_diffuse;
-uniform vec3 light_specular;
-uniform vec3 material_specular;
-uniform float material_shininess;
+uniform sampler2D textureDiff;
+uniform sampler2D textureNorm;
 
 varying vec2 vTexCoord;
 varying vec3 vLightDirection;
-varying mat3 tbn;
+varying vec3 vViewDirection;
 
 void main() {
+
+    vec3 lightDir = normalize(vLightDirection);
+
     // Local normal, in tangent space
-    vec3 pixelNormal = tbn * normalize(texture2D(textureNorm, vTexCoord).rgb*2.0 - 1.0);
-    float lambert = max(dot(pixelNormal, normalize(vLightDirection)), 0.0);
+    vec3 pixelNormal = normalize(texture2D(textureNorm, vTexCoord).rgb*2.0 - 1.0);
+    float lambert = max(dot(pixelNormal, lightDir), 0.0);
 
-    vec3 diffuse = texture2D(textureDiff, vTexCoord).rgb;
-    vec3 final_color = diffuse * lambert;
+    // diffuse + lambert
+    vec3 diffuseColor = texture2D(textureDiff, vTexCoord).rgb;
+    vec3 diffuse = lambert * diffuseColor;
+
+    // ambient
+    vec3 ambient = 0.2 * diffuseColor;
+
+    // specular
+    vec3 viewDir = normalize(vViewDirection);
+    vec3 reflectDir = reflect(-lightDir, pixelNormal);
+    vec3 halfwayDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(pixelNormal, halfwayDir), 0.0), 32.0);
+    vec3 specular = vec3(0.2) * spec;
+
+    vec3 final_color = ambient + diffuse + specular;
     gl_FragColor = vec4(final_color, 1.0);
-}
-|]
-
-
-lightVert =
-    [glsl|
-attribute vec3 position;
-uniform mat4 viewProjectionMatrix;
-
-void main(void) {
-    gl_PointSize = 20.0;
-    gl_Position = vec4((viewProjectionMatrix * vec4(position, 1.0)).xyz, 1.0);
-}
-|]
-
-
-lightFrag =
-    [glsl|
-precision mediump float;
-
-void main(void) {
-    gl_FragColor = vec4(1.0, 0.5, 0.0, 1.0);
 }
 |]
