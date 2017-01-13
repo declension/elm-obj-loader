@@ -3,3 +3,7 @@ Due to [a bug in elm reactor](https://github.com/elm-lang/elm-reactor/issues/217
 
 Using another file server works, e.g.
 using [elm-live](https://github.com/tomekwi/elm-live) or `python -m http.server`
+
+# Acknowledgements
+
+Brick textures were taken from: http://www.textures.com/
