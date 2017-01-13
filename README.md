@@ -2,6 +2,11 @@
 
 This is a small library for importing [wavefront .obj][objSpecs] files into your WebGL application.
 
+# Demo/Examples
+ * [Model viewer][modelViewer]
+ * [Suzanne from Blender][suzanne]
+
+[Src](/examples)
 
 # Limitations
 Only a small subset of the .obj file specification is supported.
@@ -20,10 +25,10 @@ No free-form curves/surfaces.
 No material library (mtllib) support.   
 No negative indexing.   
 
-# Demo/Examples
-[Suzanne from Blender][loaderDemo] / [src](/examples).
 
 
 
-[loaderDemo]: https://zinggi.github.io/randomDemos/webgl/objLoader.html
+
+[suzanne]: https://zinggi.github.io/randomDemos/webgl/objLoader_simple.html
+[modelViewer]: https://zinggi.github.io/randomDemos/webgl/objLoader_modelViewer.html
 [objSpecs]: http://www.martinreddy.net/gfx/3d/OBJ.spec

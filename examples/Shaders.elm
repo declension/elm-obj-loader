@@ -1,10 +1,60 @@
 module Shaders exposing (..)
 
-{-| normal mapping according to:
-http://www.gamasutra.com/blogs/RobertBasler/20131122/205462/Three_Normal_Mapping_Techniques_Explained_For_the_Mathematically_Uninclined.php?print=1
+{-|
+This shader uses Spherical Environment Mapping (SEM).
+Here are some relevant links:
+    * [very cool demo](https://www.clicktorelease.com/code/spherical-normal-mapping/#)
+    * https://www.clicktorelease.com/blog/creating-spherical-environment-mapping-shader
+    * http://www.ozone3d.net/tutorials/glsl_texturing_p04.php
 -}
 
 
+reflectionVert =
+    [glsl|
+
+attribute vec3 position;
+attribute vec3 normal;
+uniform mat4 mvMat;
+uniform mat4 camera;
+varying vec3 vNormal;
+
+void main()
+{
+    vec4 vertex4 = mvMat * vec4(position, 1.0);
+    vNormal = vec3(mvMat * vec4(normal, 0.0));
+    vec3 nm_z = normalize(vec3(vertex4));
+    vec3 nm_x = cross(nm_z, vec3(0.0, 1.0, 0.0));
+    vec3 nm_y = cross(nm_x, nm_z);
+    vNormal = vec3(dot(vNormal, nm_x), dot(vNormal, nm_y), dot(vNormal, nm_z));
+    gl_Position = camera * vertex4;
+}
+
+|]
+
+
+reflectionFrag =
+    [glsl|
+precision mediump float;
+
+uniform sampler2D texture;
+
+varying vec3 vNormal;
+
+void main()
+{
+    vec2 texCoord = vec2(0.5 * vNormal.x + 0.5, - 0.5 * vNormal.y - 0.5);
+    vec4 fragColor = texture2D(texture, texCoord);
+    fragColor.a = 1.0;
+
+    gl_FragColor = fragColor;
+}
+
+|]
+
+
+{-| normal mapping according to:
+http://www.gamasutra.com/blogs/RobertBasler/20131122/205462/Three_Normal_Mapping_Techniques_Explained_For_the_Mathematically_Uninclined.php?print=1
+-}
 normalVert =
     [glsl|
 attribute vec3 position;
@@ -36,6 +86,7 @@ void main()
 
     // Tangent, Bitangent, Normal space matrix TBN
     // this isn't entirely correct, it should use the normal matrix
+    // http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
     vec3 n = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     vec3 t = normalize((modelMatrix * vec4(tangent.xyz, 0.0)).xyz);
     vec3 b = normalize((modelMatrix * vec4((cross(normal, tangent.xyz) * tangent.w), 0.0)).xyz);
@@ -74,7 +125,7 @@ void main() {
     vec3 diffuse = lambert * diffuseColor * lightIntensities;
 
     // ambient
-    vec3 ambient = 0.2 * diffuseColor;
+    vec3 ambient = 0.3 * diffuseColor;
 
     // specular
     float shininess = 32.0;
@@ -120,7 +171,8 @@ void main()
     vLightDirection = lightPosition - posWorld;
     vViewDirection = viewPosition - posWorld;
     vTexCoord = texCoord;
-    vNormal = normal;
+    // this is incorrect, it should use the normal matrix
+    vNormal = mat3(modelMatrix) * normal;
     gl_Position = modelViewProjectionMatrix * pos;
 }
 |]
@@ -151,7 +203,7 @@ void main()
     vec3 diffuse = lambert * diffuseColor * lightIntensities;
 
     // ambient
-    vec3 ambient = 0.2 * diffuseColor;
+    vec3 ambient = 0.3 * diffuseColor;
 
     // specular
     float shininess = 32.0;
@@ -194,6 +246,8 @@ void main()
 
     vLightDirection = lightPosition - posWorld;
     vViewDirection = viewPosition - posWorld;
+    // this is incorrect, it should use the normal matrix
+    vNormal = mat3(modelMatrix) * normal;
     vNormal = normal;
     gl_Position = modelViewProjectionMatrix * pos;
 }

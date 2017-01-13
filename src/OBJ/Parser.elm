@@ -5,7 +5,7 @@ import Math.Vector2 as V2 exposing (Vec2, vec2)
 import Combine exposing (..)
 import Combine.Num exposing (..)
 import Combine.Char exposing (..)
-import OBJ.Types exposing (..)
+import OBJ.InternalTypes exposing (..)
 
 
 -- TODO: figure out how nice error messages work

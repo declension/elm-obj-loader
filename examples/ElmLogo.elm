@@ -2,10 +2,9 @@ module ElmLogo exposing (..)
 
 import AnimationFrame
 import Dict exposing (Dict)
-import Html exposing (div, text)
+import Html exposing (Html, div, text)
 import Html.Attributes as Attr
 import Html.Events exposing (on, onInput, onCheck)
-import Http
 import Json.Decode as JD
 import Math.Matrix4 as M4 exposing (Mat4)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
@@ -14,8 +13,6 @@ import WebGL as GL
 import WebGL.Texture
 import WebGL.Settings exposing (cullFace, front)
 import WebGL.Settings.DepthTest as DepthTest
-import OBJ
-import OBJ.Types exposing (Mesh(..))
 import Mouse
 import Window
 
@@ -23,6 +20,8 @@ import Window
 --
 
 import Shaders
+import OBJ
+import OBJ.Types exposing (Mesh(..))
 
 
 type alias Model =
@@ -87,7 +86,7 @@ type Msg
 initModel : Model
 initModel =
     { mesh = Err "loading ..."
-    , currentModel = "elmLogo.obj"
+    , currentModel = "meshes/elmLogo.obj"
     , time = 0
     , zoom = 5
     , diffText = Err "Loading texture..."
@@ -100,20 +99,26 @@ initModel =
     }
 
 
+models : List String
+models =
+    [ "meshes/elmLogo.obj"
+    , "meshes/suzanneNoUV.obj"
+    ]
+
+
 initCmd : Cmd Msg
 initCmd =
     Cmd.batch
-        [ OBJ.loadObjFileWith { withTangents = True } "elmLogo.obj" LoadObj
-        , loadTexture "elmLogoDiffuse.png" DiffTextureLoaded
-        , loadTexture "elmLogoNorm.png" NormTextureLoaded
+        [ loadModel True "meshes/elmLogo.obj"
+        , loadTexture "textures/elmLogoDiffuse.png" DiffTextureLoaded
+        , loadTexture "textures/elmLogoNorm.png" NormTextureLoaded
         , Task.perform ResizeWindow Window.size
         ]
 
 
-models =
-    [ "elmLogo.obj"
-    , "suzanne.obj"
-    ]
+loadModel : Bool -> String -> Cmd Msg
+loadModel withTangents url =
+    OBJ.loadObjFileWith { withTangents = withTangents } url (LoadObj url)
 
 
 loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
@@ -147,21 +152,10 @@ renderModel model textureDiff textureNorm mesh =
             , mvMat = M4.mul view modelM
             , modelViewProjectionMatrix = M4.mul viewProjection modelM
             , modelMatrix = modelM
-            , normalMat =
-                -- this is not generally correct, but in this example it works.
-                -- http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
-                M4.identity
-            , viewMat = view
             , viewPosition = cameraPos
             , textureDiff = textureDiff
             , textureNorm = textureNorm
-            , time = model.time
-            , light_diffuse = vec3 1.0 1.0 1.0
             , lightPosition = lightPos
-            , light_specular = vec3 0.15 0.15 0.15
-            , material_diffuse = vec3 0.5 0.5 0.5
-            , material_specular = vec3 0.15 0.15 0.15
-            , material_shininess = 100.002
             }
     in
         case mesh of
@@ -175,6 +169,7 @@ renderModel model textureDiff textureNorm mesh =
                 renderCullFace Shaders.normalVert Shaders.normalFrag (GL.indexedTriangles vertices indices) uniforms
 
 
+renderCullFace : GL.Shader a u v -> GL.Shader {} u v -> GL.Mesh a -> u -> GL.Entity
 renderCullFace =
     GL.entityWith [ DepthTest.default, cullFace front ]
 
@@ -227,13 +222,19 @@ view model =
         ]
 
 
+selectModel : Model -> Html Msg
 selectModel model =
     div [ Attr.style [ ( "position", "absolute" ), ( "z-index", "2" ), ( "backgroundColor", "white" ) ] ]
-        [ Html.select [ onInput SelectMesh, Attr.value model.currentModel ] (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
-        , text "\twith normal map: "
-        , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent, Attr.checked model.withTangent ] []
-        , text model.currentModel
-        ]
+        ([ Html.select [ onInput SelectMesh, Attr.value model.currentModel ]
+            (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
+         ]
+            ++ if String.startsWith "meshes/elmLogo" model.currentModel then
+                [ text "\twith normal map: "
+                , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent, Attr.checked model.withTangent ] []
+                ]
+               else
+                []
+        )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -245,11 +246,11 @@ update msg model =
         Zoom dy ->
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
 
-        SelectMesh m ->
-            ( model, OBJ.loadObjFileWith { withTangents = model.withTangent } m LoadObj )
+        SelectMesh url ->
+            ( model, loadModel model.withTangent url )
 
         SetUseTangent t ->
-            ( { model | withTangent = t }, OBJ.loadObjFileWith { withTangents = t } model.currentModel LoadObj )
+            ( { model | withTangent = t }, loadModel t model.currentModel )
 
         LoadObj url mesh ->
             ( { model | mesh = mesh, currentModel = url }, Cmd.none )

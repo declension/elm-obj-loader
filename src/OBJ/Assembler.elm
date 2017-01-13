@@ -6,10 +6,7 @@ import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Math.Vector4 as V4 exposing (Vec4, vec4)
 import OBJ.Types exposing (..)
-
-
--- TODO:
--- add support for calculating tangents
+import OBJ.InternalTypes exposing (..)
 
 
 compile config lines =
