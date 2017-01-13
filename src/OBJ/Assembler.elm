@@ -105,7 +105,7 @@ triangulateFace f =
 
 addCurrentMesh state =
     -- this adds the current mesh, to the current group.
-    -- We can also normalize all values here that need normalizing
+    -- We also normalize all values here that need normalizing
     case state.currentMesh of
         Just m ->
             { state
@@ -173,10 +173,9 @@ addCurrentGroup state =
 
 
 addFace f state =
-    -- this function should add a single face to the currentMesh
+    -- this function adds a single face to the currentMesh
     -- for this it needs a dictionary containing the already known vertices,
-    -- indexed using the v/vn etc. indices together with the smooth group
-    -- flat shading needs to use a unique index for the smooth group to avoid sharing vertices.
+    -- indexed using the v/vn etc.
     case state.currentMesh of
         Nothing ->
             -- we dont have a mesh yet, create one based on the type of the face
@@ -223,6 +222,7 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
                 { newState | currentMesh = Just newMesh }
 
         _ ->
+            -- TODO: lift this error into a Result type
             Debug.crash "mixed face types in the model!"
 
 
@@ -255,6 +255,10 @@ applyForFaceA f ( i1, i2, i3 ) s_0 =
 
 
 getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as index) { vs, vts, vns } =
+    -- This is from here:
+    -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
+    -- But since the reference doesn't mention what to do in case the denominator is 0,
+    -- This is probably not correct.
     case ( get3 ( pi1, pi2, pi3 ) vs vs vs, get3 ( ti1, ti2, ti3 ) vts vts vts ) of
         ( Just ( v1, v2, v3 ), Just ( w1, w2, w3 ) ) ->
             let
@@ -291,6 +295,7 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
                 ( sdir, tdir )
 
         _ ->
+            -- TODO: lift this error into a Result type
             ( vec3 1 1 1, vec3 1 1 1 )
                 |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
@@ -312,6 +317,7 @@ getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as sta
                     )
 
                 Nothing ->
+                    -- TODO: lift this error into a Result type
                     ( state, [], -42 )
                         |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
@@ -355,6 +361,7 @@ getOrInsertVTNT ( s_dir, t_dir ) index ({ vs, vts, vns, knownVertexTexturesTange
                     )
 
                 Nothing ->
+                    -- TODO: lift this error into a Result type
                     ( state, Array.empty, -42 )
                         |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
@@ -376,6 +383,7 @@ getOrInsertVN index ({ vs, vns, knownVertex, currentIndex } as state) =
                     )
 
                 Nothing ->
+                    -- TODO: lift this error into a Result type
                     ( state, [], -42 )
                         |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
 
@@ -409,7 +417,6 @@ createMesh withTangents f =
     in
         case f of
             FTVertexTextureNormal _ ->
-                -- TODO: if with or without tangent should depend on the user config
                 if withTangents then
                     WithTextureAndTangentT { emptyMesh | vertices = Array.empty }
                 else

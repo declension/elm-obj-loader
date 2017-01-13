@@ -3,11 +3,15 @@ module OBJ exposing (..)
 {-|
 # .obj file loader
 
+The returned models can be rendered using `indexedTriangles` from `WebGL`.
+
+    WebGL.indexedTriangles mesh.vertices mesh.indices
+
 ## From URL
 All these methods take an URL as the first parameter.
 
 ### Single model
-Use the methods from here if you know whats in your files
+Use the methods from here if you know whats in your file
 and if they only contain a single object with a single material.
 These are just provided for convenience.
 
@@ -40,7 +44,6 @@ import OBJ.Types exposing (..)
 
 {-|
 Load a model that doesn't have texture coordinates.
-TODO: needs testing
 -}
 loadMeshWithoutTexture : String -> (Result String (MeshWith Vertex) -> msg) -> Cmd msg
 loadMeshWithoutTexture url msg =
@@ -61,7 +64,7 @@ loadMeshWithoutTexture url msg =
 
 
 {-|
-Load a model from an URL, expecting texture coordinates.
+Load a model with texture coordinates.
 -}
 loadMesh : String -> (Result String (MeshWith VertexWithTexture) -> msg) -> Cmd msg
 loadMesh url msg =
@@ -135,7 +138,7 @@ loadObjFileWith settings url msg =
             (\s ->
                 parseObjStringWith settings s |> Task.succeed
             )
-        |> Task.onError (\e -> Task.succeed (Err ("failed to load: " ++ toString e)))
+        |> Task.onError (\e -> Task.succeed (Err ("failed to load:\n" ++ toString e)))
         |> Task.attempt
             (\r ->
                 case r of

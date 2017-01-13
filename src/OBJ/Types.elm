@@ -35,7 +35,7 @@ A `Mesh` loaded by the obj loader is a record with a list of vertices and a list
 Depending on the mesh type and the loading options you get a different kind of mesh.
 They differ on what information a vertex contains.
 
-This meshes are meant to be used with `WebGL.indexedTriangles mesh.vertices mesh.indices`.
+These meshes are meant to be used with `WebGL.indexedTriangles mesh.vertices mesh.indices`.
 -}
 type Mesh
     = WithoutTexture (MeshWith Vertex)
@@ -64,8 +64,8 @@ type alias VertexWithTexture =
 {-|
 The `tangent` is a vector pointing tangential to the object surface, in the direction of the `u` texture coordinate.
 This is needed for doing tangent space normal mapping.
-The 4th component is either 1 or -1 and has to be used
-to get the bitangent in the glsl shader, e.g: `vec3 bitangent = cross(normal, tangent.xyz) * tangent.w`
+The 4th component is either 1 or -1 and has to be used to get the bitangent in the glsl shader,
+e.g: `vec3 bitangent = cross(normal, tangent.xyz) * tangent.w`
 
 more info here:
 https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html

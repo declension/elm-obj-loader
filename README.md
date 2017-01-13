@@ -17,7 +17,7 @@ The default export options from blender work fine. Make sure you keep 'Write Nor
 
 Completely supported face types are those with vertex position, normals and optionally vertex texture coordinates. (`v`, `vn`, `vt`)
 
-Smooth groups are ignored (`g n`).  
+Smooth groups are ignored (`s n`).  
 Your model needs vertex normals (`vn`).  
 
 Only tris and quads are supported. (Tris might load slightly faster)    
