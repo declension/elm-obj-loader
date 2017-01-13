@@ -1,7 +1,6 @@
 module Suzanne exposing (..)
 
 import AnimationFrame
-import Dict exposing (Dict)
 import Html
 import Html.Attributes as Attr
 import Html.Events exposing (on)
@@ -22,14 +21,6 @@ import OBJ.Types exposing (MeshWith, VertexWithTexture)
 import Shaders exposing (reflectionVert, reflectionFrag)
 
 
-type alias Model =
-    { time : Float
-    , mesh : Result String (MeshWith VertexWithTexture)
-    , zoom : Float
-    , reflectionTexture : Result String GL.Texture
-    }
-
-
 main : Program Never Model Msg
 main =
     Html.program
@@ -40,11 +31,16 @@ main =
         }
 
 
-type Msg
-    = Tick Float
-    | LoadObj (Result String (MeshWith VertexWithTexture))
-    | Zoom Float
-    | TextureLoaded (Result String GL.Texture)
+
+-- MODEL
+
+
+type alias Model =
+    { time : Float
+    , mesh : Result String (MeshWith VertexWithTexture)
+    , zoom : Float
+    , reflectionTexture : Result String GL.Texture
+    }
 
 
 initModel : Model
@@ -60,18 +56,35 @@ initCmd =
         ]
 
 
-loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
-loadTexture url msg =
-    WebGL.Texture.load url
-        |> Task.attempt
-            (\r ->
-                case r of
-                    Ok t ->
-                        msg (Ok t)
 
-                    Err e ->
-                        msg (Err ("Failed to load texture: " ++ toString e))
-            )
+-- UPDATE
+
+
+type Msg
+    = Tick Float
+    | LoadObj (Result String (MeshWith VertexWithTexture))
+    | Zoom Float
+    | TextureLoaded (Result String GL.Texture)
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        Tick dt ->
+            ( { model | time = model.time + dt / 1000 }, Cmd.none )
+
+        Zoom dy ->
+            ( { model | zoom = model.zoom + dy / 100 }, Cmd.none )
+
+        LoadObj mesh ->
+            ( { model | mesh = mesh }, Cmd.none )
+
+        TextureLoaded t ->
+            ( { model | reflectionTexture = t }, Cmd.none )
+
+
+
+-- VIEW / RENDER
 
 
 renderModel : Model -> GL.Texture -> MeshWith VertexWithTexture -> GL.Entity
@@ -100,11 +113,6 @@ getCamera zoom t =
     )
 
 
-onZoom : Html.Attribute Msg
-onZoom =
-    on "wheel" (JD.map Zoom (JD.field "deltaY" JD.float))
-
-
 view : Model -> Html.Html Msg
 view model =
     case ( model.mesh, model.reflectionTexture ) of
@@ -117,17 +125,24 @@ view model =
             Html.div [] [ Html.text (toString a ++ "\n\n\n" ++ toString b) ]
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        Tick dt ->
-            ( { model | time = model.time + dt / 1000 }, Cmd.none )
 
-        Zoom dy ->
-            ( { model | zoom = model.zoom + dy / 100 }, Cmd.none )
+-- HELPERS
 
-        LoadObj mesh ->
-            ( { model | mesh = mesh }, Cmd.none )
 
-        TextureLoaded t ->
-            ( { model | reflectionTexture = t }, Cmd.none )
+loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
+loadTexture url msg =
+    WebGL.Texture.load url
+        |> Task.attempt
+            (\r ->
+                case r of
+                    Ok t ->
+                        msg (Ok t)
+
+                    Err e ->
+                        msg (Err ("Failed to load texture: " ++ toString e))
+            )
+
+
+onZoom : Html.Attribute Msg
+onZoom =
+    on "wheel" (JD.map Zoom (JD.field "deltaY" JD.float))
