@@ -1,6 +1,6 @@
 {
     "version": "1.0.0",
-    "summary": "Wavefront obj file loader for elm-community/webgl",
+    "summary": "Load wavefront .obj files in your WebGL scene.",
     "repository": "https://github.com/Zinggi/elm-obj-loader.git",
     "license": "MIT",
     "source-directories": [
