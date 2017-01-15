@@ -1,5 +1,8 @@
 module Shaders exposing (..)
 
+import WebGL
+
+
 {-|
 This shader uses Spherical Environment Mapping (SEM).
 Here are some relevant links:
@@ -7,8 +10,6 @@ Here are some relevant links:
     * https://www.clicktorelease.com/blog/creating-spherical-environment-mapping-shader
     * http://www.ozone3d.net/tutorials/glsl_texturing_p04.php
 -}
-
-
 reflectionVert =
     [glsl|
 
