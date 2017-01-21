@@ -3,9 +3,11 @@ module OBJ.Parser exposing (..)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Math.Vector2 as V2 exposing (Vec2, vec2)
 import Combine exposing (..)
+import Json.Decode as JD
 import Combine.Num exposing (..)
 import Combine.Char exposing (..)
 import OBJ.InternalTypes exposing (..)
+import Regex exposing (find, HowMany(..))
 
 
 -- TODO: figure out how nice error messages work
@@ -16,13 +18,37 @@ import OBJ.InternalTypes exposing (..)
 
 parse : String -> Result String (List Line)
 parse input =
-    case
-        runParser file () input
-    of
-        Ok ( state, stream, res ) ->
-            Ok res
+    String.split "\n" input
+        |> List.foldr parseLineAcc (Ok [])
 
-        Err ( state, stream, errors ) ->
+
+parseLineAcc : String -> Result String (List Line) -> Result String (List Line)
+parseLineAcc line acc =
+    case acc of
+        Ok lines ->
+            if canSkip line then
+                Ok lines
+            else
+                parseLine line
+                    |> Result.andThen
+                        (\l ->
+                            Ok (l :: lines)
+                        )
+
+        Err e ->
+            Err e
+
+
+canSkip line =
+    Regex.contains (Regex.regex "^((\\s*\\n*)|(#.*))$") line
+
+
+parseLine l =
+    case Combine.parse line l of
+        Ok ( _, stream, result ) ->
+            Ok result
+
+        Err ( _, stream, errors ) ->
             Err (formatError errors stream)
 
 
@@ -181,27 +207,9 @@ vector2 =
     vec2 <$> betterFloat <*> (spaces *> betterFloat)
 
 
-floatOrInt : Parser s Float
-floatOrInt =
-    float <|> (toFloat <$> (intWithZero <|> int))
-
-
-intWithZero : Parser s Int
-intWithZero =
-    (*)
-        <$> sign
-        <*> (toInt <$> regex "[0-9]*")
-        <?> "expected an integer with leading zeros"
-
-
 betterFloat : Parser s Float
 betterFloat =
-    floatWithE <|> floatOrInt
-
-
-floatWithE : Parser s Float
-floatWithE =
-    (\base exponent -> base * 10 ^ exponent) <$> floatOrInt <*> (string "e" *> floatOrInt)
+    (\s -> Result.withDefault 0 (JD.decodeString JD.float s)) <$> regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
 
 
 formatError : List String -> InputStream -> String

@@ -432,14 +432,6 @@ createMesh withTangents f =
 --
 
 
-log s a =
-    let
-        _ =
-            Debug.log s ()
-    in
-        a
-
-
 t3map f ( a, b, c ) =
     ( f a, f b, f c )
 
