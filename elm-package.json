@@ -1,5 +1,5 @@
 {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "summary": "Load wavefront .obj files in your WebGL scene.",
     "repository": "https://github.com/Zinggi/elm-obj-loader.git",
     "license": "MIT",
