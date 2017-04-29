@@ -40,7 +40,7 @@ parseLineAcc line acc =
 
 
 canSkip line =
-    Regex.contains (Regex.regex "^((\\s*\\n*)|(#.*))$") line
+    Regex.contains (Regex.regex "^((\\s*)|(\\s*#.*\\r?))$") line
 
 
 parseLine l =
