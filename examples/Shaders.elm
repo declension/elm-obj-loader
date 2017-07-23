@@ -3,12 +3,13 @@ module Shaders exposing (..)
 import WebGL
 
 
-{-|
-This shader uses Spherical Environment Mapping (SEM).
+{-| This shader uses Spherical Environment Mapping (SEM).
 Here are some relevant links:
-    * [very cool demo](https://www.clicktorelease.com/code/spherical-normal-mapping/#)
-    * https://www.clicktorelease.com/blog/creating-spherical-environment-mapping-shader
-    * http://www.ozone3d.net/tutorials/glsl_texturing_p04.php
+
+  - [very cool demo](https://www.clicktorelease.com/code/spherical-normal-mapping/#)
+  - <https://www.clicktorelease.com/blog/creating-spherical-environment-mapping-shader>
+  - <http://www.ozone3d.net/tutorials/glsl_texturing_p04.php>
+
 -}
 reflectionVert =
     [glsl|
@@ -54,7 +55,7 @@ void main()
 
 
 {-| normal mapping according to:
-http://www.gamasutra.com/blogs/RobertBasler/20131122/205462/Three_Normal_Mapping_Techniques_Explained_For_the_Mathematically_Uninclined.php?print=1
+<http://www.gamasutra.com/blogs/RobertBasler/20131122/205462/Three_Normal_Mapping_Techniques_Explained_For_the_Mathematically_Uninclined.php?print=1>
 -}
 normalVert =
     [glsl|
@@ -87,6 +88,8 @@ void main()
 
     // Tangent, Bitangent, Normal space matrix TBN
     // this isn't entirely correct, it should use the normal matrix
+    // In this special case it works out well,
+    // since my model matrix does not contain any rotation or translation.
     // http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/
     vec3 n = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     vec3 t = normalize((modelMatrix * vec4(tangent.xyz, 0.0)).xyz);
@@ -247,8 +250,9 @@ void main()
 
     vLightDirection = lightPosition - posWorld;
     vViewDirection = viewPosition - posWorld;
-    // this is incorrect, it should use the normal matrix
-    vNormal = mat3(modelMatrix) * normal;
+    // this is incorrect, it should use the normal matrix, like this:
+    // vNormal = mat3(normalMatrix) * normal;
+    // it works in this case, since the modelMatrix is the identity matrix
     vNormal = normal;
     gl_Position = modelViewProjectionMatrix * pos;
 }
