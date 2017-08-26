@@ -98,7 +98,8 @@ This is needed if you want to do tangent space normal mapping.
 -}
 loadMeshWithTangent : String -> (Result String (MeshWith VertexWithTextureAndTangent) -> msg) -> Cmd msg
 loadMeshWithTangent url msg =
-    loadObjFile url
+    loadObjFileWith { withTangents = True }
+        url
         (\res ->
             case res of
                 Ok f ->
