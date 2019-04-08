@@ -1,8 +1,8 @@
-module OBJ.InternalTypes exposing (..)
+module OBJ.InternalTypes exposing (Face(..), FaceTriangle(..), Group(..), Int2, Int3, Line(..), MeshT(..), MeshWithT, ThreeOrFour(..), VertexWithTextureAndTangentT, log)
 
-import Math.Vector3 exposing (Vec3)
+import Array exposing (Array)
 import Math.Vector2 exposing (Vec2)
-import Array.Hamt as Array exposing (Array)
+import Math.Vector3 exposing (Vec3)
 import OBJ.Types exposing (..)
 
 
@@ -82,9 +82,14 @@ type FaceTriangle
     | FTVertexNormal ( Int2, Int2, Int2 )
 
 
-type ThreeOrFour a
-    = Three ( a, a, a )
-    | Four ( a, a, a, a )
+type ThreeOrFour t
+    = Three { a : t, b : t, c : t }
+    | Four
+        { a : t
+        , b : t
+        , c : t
+        , d : t
+        }
 
 
 type Group

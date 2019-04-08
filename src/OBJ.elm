@@ -38,6 +38,7 @@ if your files contain multiple groups or materials.
 
 -}
 
+import Debug exposing (toString)
 import Dict exposing (Dict)
 import Http
 import OBJ.Assembler exposing (compile)

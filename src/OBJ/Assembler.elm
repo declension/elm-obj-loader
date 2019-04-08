@@ -1,6 +1,7 @@
-module OBJ.Assembler exposing (..)
+module OBJ.Assembler exposing (addCurrentGroup, addCurrentMesh, addFace, addFaceToMesh, applyForFace, applyForFaceA, arrayUpdate, compile, compileHelper, createMesh, emptyCompileState, finalizeMesh, fst2, get2, get3, getFaceTangent, getOrInsertVN, getOrInsertVTN, getOrInsertVTNT, insertLine, t3map, triangulate, triangulateFace, updateArray)
 
-import Array.Hamt as Array exposing (Array)
+import Array exposing (Array)
+import Debug exposing (toString)
 import Dict exposing (Dict)
 import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
@@ -119,7 +120,7 @@ addCurrentMesh state =
         _ ->
             state
 
-
+finalizeMesh : MeshT -> Mesh
 finalizeMesh mesh =
     case mesh of
         WithTextureT m ->
@@ -129,37 +130,32 @@ finalizeMesh mesh =
             WithoutTexture m
 
         WithTextureAndTangentT m ->
-            WithTextureAndTangent
-                { m
-                    | vertices =
-                        Array.foldr
-                            (\({ position, texCoord, normal, sdir, tdir } as v) acc ->
-                                let
-                                    -- handedness:
-                                    -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
-                                    w =
-                                        if V3.dot (V3.cross normal sdir) tdir < 0 then
-                                            -1
-                                        else
-                                            1
+            WithTextureAndTangent {indices = m.indices, vertices = Array.foldr reducer [] m.vertices }
 
-                                    ( x, y, z ) =
-                                        -- I have not seen this anywhere, but I added it because I sometimes got (0,0,0)
-                                        if V3.lengthSquared sdir /= 0 then
-                                            V3.toTuple <| V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
-                                        else
-                                            V3.toTuple <| V3.cross (V3.normalize (V3.sub tdir (V3.scale (V3.dot normal tdir) normal))) normal
-                                in
-                                    { position = position
-                                    , texCoord = texCoord
-                                    , normal = normal
-                                    , tangent = vec4 x y z w
-                                    }
-                                        :: acc
-                            )
-                            []
-                            m.vertices
-                }
+reducer : VertexWithTextureAndTangentT -> List VertexWithTextureAndTangent -> List VertexWithTextureAndTangent
+reducer { position, texCoord, normal, sdir, tdir } acc =
+    let
+        -- handedness:
+        -- https://web.archive.org/web/20160409104130/http://www.terathon.com/code/tangent.html
+        w =
+            if V3.dot (V3.cross normal sdir) tdir < 0 then
+                -1
+            else
+                1
+
+        { x, y, z } =
+            -- I have not seen this anywhere, but I added it because I sometimes got (0,0,0)
+            if V3.lengthSquared sdir /= 0 then
+                V3.toRecord <| V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
+            else
+                V3.toRecord <| V3.cross (V3.normalize (V3.sub tdir (V3.scale (V3.dot normal tdir) normal))) normal
+    in
+        { position = position
+        , texCoord = texCoord
+        , normal = normal
+        , tangent = vec4 x y z w
+        }
+        :: acc
 
 
 addCurrentGroup state =
@@ -223,7 +219,22 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
 
         _ ->
             -- TODO: lift this error into a Result type
-            Debug.crash "mixed face types in the model!"
+            Debug.log "ERROR: mixed face types in the model!" <|
+
+            {      config = { withTangents=False }
+                 , currentMesh = Nothing
+                 , currentGroup = Dict.empty
+                 , currentGroupName = "(error)"
+                 , currentMaterialName = "(error)"
+                 , vs = Array.empty
+                 , vts = Array.empty
+                 , vns = Array.empty
+                 , groups = Dict.empty
+                 , currentIndex = 0
+                 , knownVertexTextures = Dict.empty
+                 , knownVertexTexturesTangents = Dict.empty
+                 , knownVertex = Dict.empty}
+
 
 
 applyForFace f ( i1, i2, i3 ) s_0 =
@@ -262,20 +273,20 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
     case ( get3 ( pi1, pi2, pi3 ) vs vs vs, get3 ( ti1, ti2, ti3 ) vts vts vts ) of
         ( Just ( v1, v2, v3 ), Just ( w1, w2, w3 ) ) ->
             let
-                ( ( v1x, v1y, v1z ), ( v2x, v2y, v2z ), ( v3x, v3y, v3z ) ) =
-                    t3map V3.toTuple ( v1, v2, v3 )
+                ( vv1, vv2, vv3) =
+                    t3map V3.toRecord ( v1, v2, v3 )
 
-                ( ( w1x, w1y ), ( w2x, w2y ), ( w3x, w3y ) ) =
-                    t3map V2.toTuple ( w1, w2, w3 )
+                ( ww1, ww2, ww3 ) =
+                    t3map V2.toRecord ( w1, w2, w3 )
 
                 ( ( x1, x2 ), ( y1, y2 ), ( z1, z2 ) ) =
-                    ( ( v2x - v1x, v3x - v1x )
-                    , ( v2y - v1y, v3y - v1y )
-                    , ( v2z - v1z, v3z - v1z )
+                    ( ( vv2.x - vv1.x, vv3.x - vv1.x )
+                    , ( vv2.y - vv1.y, vv3.y - vv1.y )
+                    , ( vv2.z - vv1.z, vv3.z - vv1.z )
                     )
 
                 ( ( s1, s2 ), ( t1, t2 ) ) =
-                    ( ( w2x - w1x, w3x - w1x ), ( w2y - w1y, w3y - w1y ) )
+                    ( ( ww2.x - ww1.x, ww3.x - ww1.x ), ( ww2.y - ww1.y, ww3.y - ww1.y ) )
 
                 denom =
                     s1 * t2 - s2 * t1
@@ -403,22 +414,24 @@ arrayUpdate i f a =
 
 triangulate threeOrFour =
     case threeOrFour of
-        Three t ->
-            [ t ]
+        Three { a, b, c } ->
+            [ ( a, b, c ) ]
 
-        Four ( a, b, c, d ) ->
+        Four { a, b, c, d } ->
             [ ( a, b, c ), ( d, a, c ) ]
 
 
 createMesh withTangents f =
     let
+        emptyMeshT =
+            { vertices = Array.empty, indices = [] }
         emptyMesh =
             { vertices = [], indices = [] }
     in
         case f of
             FTVertexTextureNormal _ ->
                 if withTangents then
-                    WithTextureAndTangentT { emptyMesh | vertices = Array.empty }
+                    WithTextureAndTangentT emptyMeshT
                 else
                     WithTextureT emptyMesh
 

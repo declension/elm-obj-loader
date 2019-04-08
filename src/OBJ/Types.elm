@@ -1,4 +1,7 @@
-module OBJ.Types exposing (..)
+module OBJ.Types exposing
+    ( ObjFile, Mesh(..), MeshWith
+    , Vertex, VertexWithTexture, VertexWithTextureAndTangent
+    )
 
 {-|
 These are the types used by the obj loader.
