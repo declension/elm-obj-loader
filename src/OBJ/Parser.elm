@@ -4,10 +4,10 @@ import Combine exposing (..)
 import Combine.Char exposing (..)
 import Combine.Num exposing (..)
 import Json.Decode as JD
-import Math.Vector2 as V2 exposing (Vec2, vec2)
+import Math.Vector2 exposing (Vec2, vec2)
 import Math.Vector3 as V3 exposing (Vec3, toRecord, vec3)
 import OBJ.InternalTypes exposing (..)
-import Regex exposing (find)
+import Regex
 
 
 
@@ -42,12 +42,14 @@ parseLineAcc line_ acc =
 
 canSkip : String -> Bool
 canSkip =
-    Maybe.withDefault (always False) (maybeMapper "^((\\s*)|(\\s*#.*\\r?))$")
+    regexMatches "^((\\s*)|(\\s*#.*\\r?))$"
 
 
-maybeMapper : String -> Maybe (String -> Bool)
-maybeMapper regexStr =
-    Maybe.map Regex.contains (Regex.fromString regexStr)
+regexMatches : String -> String -> Bool
+regexMatches regexStr str =
+    Regex.fromString regexStr
+        |> Maybe.map (\regex -> Regex.contains regex str)
+        |> Maybe.withDefault False
 
 
 parseLine l =
@@ -73,28 +75,28 @@ ignoredLines =
 
 objectName : Parser s String
 objectName =
-    ignore (regex "o[ \t]+") (regex ".+")
+    regex "o[ \t]+" |> keep (regex ".+")
 
 
 mtllib : Parser s String
 mtllib =
-    ignore (regex "mtllib[ \t]+") (regex ".+")
+    regex "mtllib[ \t]+" |> keep (regex ".+")
 
 
 group : Parser s String
 group =
-    or (ignore (regex "g[ \t]+") (regex ".+"))
-        (ignore (char 'g') (succeed ""))
+    or (regex "g[ \t]+" |> keep (regex ".+"))
+        (char 'g' |> keep (succeed ""))
 
 
 smooth : Parser s String
 smooth =
-    ignore (regex "s[ \t]+") (regex ".+")
+    regex "s[ \t]+" |> keep (regex ".+")
 
 
 usemtl : Parser s String
 usemtl =
-    ignore (regex "usemtl[ \t]+") (regex ".+")
+    regex "usemtl[ \t]+" |> keep (regex ".+")
 
 
 line : Parser s Line
@@ -116,7 +118,7 @@ line =
 
 face : Parser s Face
 face =
-    ignore (regex "f[ \t]+")
+    regex "f[ \t]+" |> keep
         (choice
             [ fVertexTextureNormal
             , fVertexNormal
@@ -147,41 +149,41 @@ fVertexNormal =
 
 
 threeValues : (a -> a -> a -> b) -> Parser s a -> Parser s b
-threeValues tagger vtype =
-    vtype
-    |> map tagger
-    |> andMap (ignore spaces vtype)
-    |> andMap (ignore spaces vtype)
+threeValues tagger parser =
+    parser
+        |> map tagger
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
 
 
 fourValues : (a -> a -> a -> a -> b) -> Parser s a -> Parser s b
-fourValues tagger vtype =
-    vtype
-    |> map tagger
-    |> andMap (ignore spaces vtype)
-    |> andMap (ignore spaces vtype)
-    |> andMap (ignore spaces vtype)
+fourValues tagger parser =
+    parser
+        |> map tagger
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
 
 
 threeOrFourValues : Parser s a -> Parser s (ThreeOrFour a)
-threeOrFourValues elements =
-    or (map Four <| fourValues (\a b c d -> { a = a, b = b, c = c, d = d }) elements)
-        (map Three <| threeValues (\a b c -> { a = a, b = b, c = c }) elements)
+threeOrFourValues elementType =
+    or (map Four <| fourValues (\a b c d -> { a = a, b = b, c = c, d = d }) elementType)
+        (map Three <| threeValues (\a b c -> { a = a, b = b, c = c }) elementType)
 
 
 int_int : Parser s ( Int, Int )
 int_int =
     int
         |> map tuple2
-        |> andMap (ignore (string "/") int)
+        |> andMap (string "/" |> keep int)
 
 
 int_int_int : Parser s ( Int, Int, Int )
 int_int_int =
     int
         |> map tuple3
-        |> andMap (ignore (string "/") int)
-        |> andMap (ignore (string "/") int)
+        |> andMap (string "/" |> keep int)
+        |> andMap (string "/" |> keep int)
 
 
 tuple2 : a -> b -> ( a, b )
@@ -198,27 +200,27 @@ int__int : Parser s ( Int, Int )
 int__int =
     int
         |> map tuple2
-        |> andMap (ignore (string "//") int)
+        |> andMap (string "//" |> keep int)
 
 
 vertexNormal : Parser s Vec3
 vertexNormal =
-    ignore (regex "vn[ \t]+") (map V3.normalize vector3)
+    regex "vn[ \t]+" |> keep (map V3.normalize vector3)
 
 
 vertexTexture : Parser s Vec2
 vertexTexture =
-    ignore (regex "vt[ \t]+") (or (map ignoreZ vector3) vector2)
+    regex "vt[ \t]+" |> keep (or (map ignoreZ vector3) vector2)
 
 
 vertex : Parser s Vec3
 vertex =
-    ignore (regex "v[ \t]+") vector3
+    regex "v[ \t]+" |> keep vector3
 
 
 comment : Parser s String
 comment =
-    ignore (regex "#") (regex ".*")
+    regex "#" |> keep (regex ".*")
 
 
 vector3 : Parser s Vec3
@@ -233,14 +235,16 @@ spaces =
 
 vector2 : Parser s Vec2
 vector2 =
-    betterFloat |> map vec2 |> andMap (ignore spaces betterFloat)
+    betterFloat |> map vec2 |> andMap (spaces |> keep betterFloat)
 
 
 betterFloat : Parser s Float
 betterFloat =
-    map defaultingFloatParser <| regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
+    map parseFloatOrZero <| regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
 
-defaultingFloatParser s = Result.withDefault 0 (JD.decodeString JD.float s)
+parseFloatOrZero s =
+    Result.withDefault 0 (JD.decodeString JD.float s)
+
 
 formatError : List String -> InputStream -> String
 formatError ms stream =
