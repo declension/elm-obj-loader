@@ -1,33 +1,31 @@
 module ElmLogo exposing (..)
 
-import AnimationFrame
+import Browser
+import Browser.Events exposing (onAnimationFrame, onMouseDown, onMouseMove, onMouseUp, onResize)
+import Debug exposing (toString)
 import Dict exposing (Dict)
 import Html exposing (Html, div, text)
 import Html.Attributes as Attr
-import Html.Events exposing (on, onInput, onCheck)
-import Json.Decode as JD
+import Html.Events exposing (on, onCheck, onInput)
+import Json.Decode as JD exposing (int)
 import Math.Matrix4 as M4 exposing (Mat4)
-import Math.Vector3 as V3 exposing (Vec3, vec3)
+import Math.Vector2 as Vec2 exposing (Vec2, vec2)
+import Math.Vector3 exposing (Vec3, vec3)
+import OBJ
+import OBJ.Types exposing (Mesh(..), ObjFile)
+import Shaders
 import Task
+import Time exposing (Posix(..), posixToMillis)
 import WebGL as GL
-import WebGL.Texture
 import WebGL.Settings exposing (cullFace, front)
 import WebGL.Settings.DepthTest as DepthTest
-import Mouse
-import Window
+import WebGL.Texture exposing (Texture)
 
 
---
-
-import Shaders
-import OBJ
-import OBJ.Types exposing (ObjFile, Mesh(..))
-
-
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Html.program
-        { init = ( initModel, initCmd )
+    Browser.element
+        { init = always ( initModel, initCmd )
         , view = view
         , subscriptions = subscriptions
         , update = update
@@ -43,18 +41,14 @@ type alias Model =
     , mesh : Result String ObjFile
     , currentModel : String
     , zoom : Float
-    , diffText : Result String GL.Texture
-    , normText : Result String GL.Texture
+    , diffText : Result String Texture
+    , normText : Result String Texture
     , isDown : Bool
-    , lastMousePos : Mouse.Position
-    , mouseDelta : MouseDelta
-    , windowSize : Window.Size
+    , lastMousePos : Vec2
+    , mouseDelta : Vec2
+    , windowSize : Size
     , withTangent : Bool
     }
-
-
-type alias MouseDelta =
-    { x : Float, y : Float }
 
 
 initModel : Model
@@ -66,9 +60,9 @@ initModel =
     , diffText = Err "Loading texture..."
     , normText = Err "Loading texture..."
     , isDown = False
-    , lastMousePos = Mouse.Position 0 0
-    , mouseDelta = MouseDelta 0 (pi / 2)
-    , windowSize = Window.Size 800 600
+    , lastMousePos = vec2 0 0
+    , mouseDelta = vec2 0 (pi / 2)
+    , windowSize = Size 800 600
     , withTangent = True
     }
 
@@ -86,7 +80,6 @@ initCmd =
         [ loadModel True "meshes/elmLogo.obj"
         , loadTexture "textures/elmLogoDiffuse.png" DiffTextureLoaded
         , loadTexture "textures/elmLogoNorm.png" NormTextureLoaded
-        , Task.perform ResizeWindow Window.size
         ]
 
 
@@ -99,25 +92,33 @@ loadModel withTangents url =
 -- UPDATE
 
 
+type alias Size =
+    { width : Int, height : Int }
+
+
 type Msg
-    = Tick Float
+    = Tick Posix
     | LoadObj String (Result String (Dict String (Dict String Mesh)))
     | Zoom Float
-    | MouseMove Mouse.Position
-    | MouseDown Mouse.Position
+    | MouseMove Int Int
+    | MouseDown Int Int
     | MouseUp
-    | DiffTextureLoaded (Result String GL.Texture)
-    | NormTextureLoaded (Result String GL.Texture)
-    | ResizeWindow Window.Size
+    | DiffTextureLoaded (Result String Texture)
+    | NormTextureLoaded (Result String Texture)
+    | ResizeWindow Int Int
     | SelectMesh String
     | SetUseTangent Bool
+
+
+type alias CameraInfo =
+    { projection : Mat4, view : Mat4, viewProjection : Mat4, position : Vec3 }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick dt ->
-            ( { model | time = model.time + dt / 1000 }, Cmd.none )
+            ( { model | time = model.time + (posixToMillis dt |> toFloat) / 1000000000 }, Cmd.none )
 
         Zoom dy ->
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
@@ -137,27 +138,31 @@ update msg model =
         NormTextureLoaded t ->
             ( { model | normText = t }, Cmd.none )
 
-        MouseDown p ->
-            ( { model | isDown = True, lastMousePos = p }, Cmd.none )
+        MouseDown x y ->
+            ( { model | isDown = True, lastMousePos = vec2 (toFloat x) (toFloat y) }, Cmd.none )
 
         MouseUp ->
             ( { model | isDown = False }, Cmd.none )
 
-        MouseMove p ->
-            ( { model | mouseDelta = getDelta p model.lastMousePos model.mouseDelta, lastMousePos = p }, Cmd.none )
+        MouseMove x y ->
+            let
+                pos =
+                    vec2 (toFloat x) (toFloat y)
+            in
+            ( { model | mouseDelta = getDelta pos model.lastMousePos model.mouseDelta, lastMousePos = pos }, Cmd.none )
 
-        ResizeWindow w ->
-            ( { model | windowSize = w }, Cmd.none )
+        ResizeWindow x y ->
+            ( { model | windowSize = { width = x, height = y } }, Cmd.none )
 
 
 
 -- VIEW / RENDER
 
 
-renderModel : Model -> GL.Texture -> GL.Texture -> Mesh -> GL.Entity
+renderModel : Model -> Texture -> Texture -> Mesh -> GL.Entity
 renderModel model textureDiff textureNorm mesh =
     let
-        ( camera, view, viewProjection, cameraPos ) =
+        camera =
             getCamera model
 
         modelM =
@@ -168,10 +173,10 @@ renderModel model textureDiff textureNorm mesh =
 
         uniforms =
             { camera = camera
-            , mvMat = M4.mul view modelM
-            , modelViewProjectionMatrix = M4.mul viewProjection modelM
+            , mvMat = M4.mul camera.view modelM
+            , modelViewProjectionMatrix = M4.mul camera.viewProjection modelM
             , modelMatrix = modelM
-            , viewPosition = cameraPos
+            , viewPosition = camera.position
             , textureDiff = textureDiff
             , textureNorm = textureNorm
             , lightPosition = lightPos
@@ -188,11 +193,11 @@ renderModel model textureDiff textureNorm mesh =
                 renderCullFace Shaders.normalVert Shaders.normalFrag (GL.indexedTriangles vertices indices) uniforms
 
 
-getCamera : Model -> ( Mat4, Mat4, Mat4, Vec3 )
+getCamera : Model -> CameraInfo
 getCamera { mouseDelta, zoom, windowSize } =
     let
         ( mx, my ) =
-            ( mouseDelta.x, mouseDelta.y )
+            ( Vec2.getX mouseDelta, Vec2.getY mouseDelta )
 
         aspect =
             toFloat windowSize.width / toFloat windowSize.height
@@ -203,10 +208,10 @@ getCamera { mouseDelta, zoom, windowSize } =
         position =
             vec3 (zoom * sin -mx * sin my) (-zoom * cos my + 1) (zoom * cos -mx * sin my)
 
-        view =
-            M4.makeLookAt (position) (vec3 0 1 0) (vec3 0 1 0)
+        view_ =
+            M4.makeLookAt position (vec3 0 1 0) (vec3 0 1 0)
     in
-        ( proj, view, M4.mul proj view, position )
+    { projection = proj, view = view_, viewProjection = M4.mul proj view_, position = position }
 
 
 view : Model -> Html.Html Msg
@@ -217,9 +222,9 @@ view model =
             ( Ok m, Ok td, Ok tn ) ->
                 GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
                     [ onZoom
-                    , Attr.width (model.windowSize.width)
-                    , Attr.height (model.windowSize.height)
-                    , Attr.style [ ( "position", "absolute" ) ]
+                    , Attr.width model.windowSize.width
+                    , Attr.height model.windowSize.height
+                    , Attr.style "position" "absolute"
                     ]
                     (Dict.values m
                         |> List.concatMap Dict.values
@@ -233,7 +238,7 @@ view model =
 
 selectModel : Model -> Html Msg
 selectModel model =
-    div [ Attr.style [ ( "position", "absolute" ), ( "z-index", "2" ), ( "backgroundColor", "white" ) ] ]
+    div [ Attr.style "position" "absolute", Attr.style "z-index" "2", Attr.style "backgroundColor" "white" ]
         ([ Html.select [ onInput SelectMesh, Attr.value model.currentModel ]
             (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
          ]
@@ -254,14 +259,15 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         ((if model.isDown then
-            [ Mouse.moves MouseMove ]
+            [ onMouseMove (decodeMouse MouseMove)]
+
           else
             []
          )
-            ++ [ AnimationFrame.diffs Tick
-               , Mouse.downs MouseDown
-               , Mouse.ups (\_ -> MouseUp)
-               , Window.resizes ResizeWindow
+            ++ [ onAnimationFrame Tick
+               , onMouseUp (JD.succeed MouseUp)
+               , onMouseDown (decodeMouse MouseDown)
+               , onResize ResizeWindow
                ]
         )
 
@@ -270,17 +276,25 @@ subscriptions model =
 -- HELPERS
 
 
+decodeMouse : (Int -> Int -> Msg) -> JD.Decoder Msg
+decodeMouse mapper =
+    JD.map2 mapper
+        (JD.field "clientX" int)
+        (JD.field "clientY" int)
+
+
 onZoom : Html.Attribute Msg
 onZoom =
     on "wheel" (JD.map Zoom (JD.field "deltaY" JD.float))
 
 
-getDelta : Mouse.Position -> Mouse.Position -> MouseDelta -> MouseDelta
+getDelta : Vec2 -> Vec2 -> Vec2 -> Vec2
 getDelta curr lastP delta =
-    MouseDelta (toFloat (curr.x - lastP.x) / 100 + delta.x) (clamp 0.01 pi (toFloat (curr.y - lastP.y) / 100 + delta.y))
+    vec2 ((Vec2.getX curr - Vec2.getX lastP) / 100 + Vec2.getX delta)
+        ((Vec2.getY curr - Vec2.getY lastP) / 100 + Vec2.getY delta |> clamp 0.01 pi)
 
 
-loadTexture : String -> (Result String GL.Texture -> msg) -> Cmd msg
+loadTexture : String -> (Result String Texture -> msg) -> Cmd msg
 loadTexture url msg =
     WebGL.Texture.load url
         |> Task.attempt
