@@ -1,7 +1,6 @@
 module OBJ.Assembler exposing (addCurrentGroup, addCurrentMesh, addFace, addFaceToMesh, applyForFace, applyForFaceA, arrayUpdate, compile, compileHelper, createMesh, emptyCompileState, finalizeMesh, fst2, get2, get3, getFaceTangent, getOrInsertVN, getOrInsertVTN, getOrInsertVTNT, insertLine, t3map, triangulate, triangulateFace, updateArray)
 
 import Array exposing (Array)
-import Debug exposing (toString)
 import Dict exposing (Dict)
 import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
@@ -223,21 +222,20 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
 
         _ ->
             -- TODO: lift this error into a Result type
-            Debug.log "ERROR: mixed face types in the model!" <|
-                { config = { withTangents = False }
-                , currentMesh = Nothing
-                , currentGroup = Dict.empty
-                , currentGroupName = "(error)"
-                , currentMaterialName = "(error)"
-                , vs = Array.empty
-                , vts = Array.empty
-                , vns = Array.empty
-                , groups = Dict.empty
-                , currentIndex = 0
-                , knownVertexTextures = Dict.empty
-                , knownVertexTexturesTangents = Dict.empty
-                , knownVertex = Dict.empty
-                }
+            { config = { withTangents = False }
+            , currentMesh = Nothing
+            , currentGroup = Dict.empty
+            , currentGroupName = "(error)"
+            , currentMaterialName = "(error)"
+            , vs = Array.empty
+            , vts = Array.empty
+            , vns = Array.empty
+            , groups = Dict.empty
+            , currentIndex = 0
+            , knownVertexTextures = Dict.empty
+            , knownVertexTexturesTangents = Dict.empty
+            , knownVertex = Dict.empty
+            }
 
 
 applyForFace f ( i1, i2, i3 ) s_0 =
@@ -311,8 +309,7 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
 
         _ ->
             -- TODO: lift this error into a Result type
-            ( vec3 1 1 1, vec3 1 1 1 )
-                |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
+            ( vec3 -999 -999 -999, vec3 -999 -999 -999 )
 
 
 getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as state) =
@@ -333,8 +330,7 @@ getOrInsertVTN index ({ vs, vts, vns, knownVertexTextures, currentIndex } as sta
 
                 Nothing ->
                     -- TODO: lift this error into a Result type
-                    ( state, [], -42 )
-                        |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
+                    ( state, [], -999 )
 
 
 getOrInsertVTNT ( s_dir, t_dir ) index ({ vs, vts, vns, knownVertexTexturesTangents, currentIndex } as state) =
@@ -377,8 +373,7 @@ getOrInsertVTNT ( s_dir, t_dir ) index ({ vs, vts, vns, knownVertexTexturesTange
 
                 Nothing ->
                     -- TODO: lift this error into a Result type
-                    ( state, Array.empty, -42 )
-                        |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
+                    ( state, Array.empty, -999 )
 
 
 getOrInsertVN index ({ vs, vns, knownVertex, currentIndex } as state) =
@@ -399,8 +394,7 @@ getOrInsertVN index ({ vs, vns, knownVertex, currentIndex } as state) =
 
                 Nothing ->
                     -- TODO: lift this error into a Result type
-                    ( state, [], -42 )
-                        |> log ("index " ++ toString index ++ " out of bounds!\nThis should never happen with a well formed file")
+                    ( state, [], -999 )
 
 
 fst2 ( a, b, c ) =

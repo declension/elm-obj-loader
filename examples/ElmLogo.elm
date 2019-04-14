@@ -1,8 +1,7 @@
-module ElmLogo exposing (..)
+module ElmLogo exposing (CameraInfo, Model, Msg(..), Size, decodeMouse, getCamera, getDelta, initCmd, initModel, loadModel, loadTexture, main, models, onZoom, renderCullFace, renderModel, selectModel, subscriptions, update, view)
 
 import Browser
 import Browser.Events exposing (onAnimationFrame, onMouseDown, onMouseMove, onMouseUp, onResize)
-import Debug exposing (toString)
 import Dict exposing (Dict)
 import Html exposing (Html, div, text)
 import Html.Attributes as Attr
@@ -14,12 +13,13 @@ import Math.Vector3 exposing (Vec3, vec3)
 import OBJ
 import OBJ.Types exposing (Mesh(..), ObjFile)
 import Shaders
+import String exposing (fromInt)
 import Task
 import Time exposing (Posix(..), posixToMillis)
 import WebGL as GL
 import WebGL.Settings exposing (cullFace, front)
 import WebGL.Settings.DepthTest as DepthTest
-import WebGL.Texture exposing (Texture)
+import WebGL.Texture exposing (Error(..), Texture)
 
 
 main : Program () Model Msg
@@ -182,15 +182,15 @@ renderModel model textureDiff textureNorm mesh =
             , lightPosition = lightPos
             }
     in
-        case mesh of
-            WithoutTexture { vertices, indices } ->
-                renderCullFace Shaders.simpleVert Shaders.simpleFrag (GL.indexedTriangles vertices indices) uniforms
+    case mesh of
+        WithoutTexture { vertices, indices } ->
+            renderCullFace Shaders.simpleVert Shaders.simpleFrag (GL.indexedTriangles vertices indices) uniforms
 
-            WithTexture { vertices, indices } ->
-                renderCullFace Shaders.noNormalVert Shaders.noNormalFrag (GL.indexedTriangles vertices indices) uniforms
+        WithTexture { vertices, indices } ->
+            renderCullFace Shaders.noNormalVert Shaders.noNormalFrag (GL.indexedTriangles vertices indices) uniforms
 
-            WithTextureAndTangent { vertices, indices } ->
-                renderCullFace Shaders.normalVert Shaders.normalFrag (GL.indexedTriangles vertices indices) uniforms
+        WithTextureAndTangent { vertices, indices } ->
+            renderCullFace Shaders.normalVert Shaders.normalFrag (GL.indexedTriangles vertices indices) uniforms
 
 
 getCamera : Model -> CameraInfo
@@ -231,8 +231,11 @@ view model =
                         |> List.map (renderModel model td tn)
                     )
 
-            err ->
-                Html.div [] [ Html.text (toString err) ]
+            ( Err m, _, _ ) ->
+                Html.div [] [ Html.text <| "ERROR with mesh: " ++ m ]
+
+            _ ->
+                Html.div [] [ Html.text <| "Non-mesh error." ]
         ]
 
 
@@ -242,12 +245,14 @@ selectModel model =
         ([ Html.select [ onInput SelectMesh, Attr.value model.currentModel ]
             (List.map (\t -> Html.option [ Attr.value t ] [ text t ]) models)
          ]
-            ++ if String.startsWith "meshes/elmLogo" model.currentModel then
-                [ text "\twith normal map: "
-                , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent, Attr.checked model.withTangent ] []
-                ]
-               else
-                []
+            ++ (if String.startsWith "meshes/elmLogo" model.currentModel then
+                    [ text "\twith normal map: "
+                    , Html.input [ Attr.type_ "checkbox", onCheck SetUseTangent, Attr.checked model.withTangent ] []
+                    ]
+
+                else
+                    []
+               )
         )
 
 
@@ -259,7 +264,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         ((if model.isDown then
-            [ onMouseMove (decodeMouse MouseMove)]
+            [ onMouseMove (decodeMouse MouseMove) ]
 
           else
             []
@@ -303,8 +308,11 @@ loadTexture url msg =
                     Ok t ->
                         msg (Ok t)
 
-                    Err e ->
-                        msg (Err ("Failed to load texture: " ++ toString e))
+                    Err LoadError ->
+                        msg (Err "Failed to load texture")
+
+                    Err (SizeError w h) ->
+                        msg (Err ("Invalid texture size: " ++ fromInt w ++ " x " ++ fromInt h))
             )
 
 

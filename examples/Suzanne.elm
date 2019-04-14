@@ -11,11 +11,12 @@ import Math.Vector3 exposing (Vec3, vec3)
 import OBJ
 import OBJ.Types exposing (MeshWith, VertexWithTexture)
 import Shaders exposing (reflectionFrag, reflectionVert)
+import String exposing (fromInt)
 import Task
 import WebGL as GL
 import WebGL.Settings exposing (cullFace, front)
 import WebGL.Settings.DepthTest as DepthTest
-import WebGL.Texture exposing (Texture)
+import WebGL.Texture exposing (Error(..), Texture)
 
 
 main : Program () Model Msg
@@ -96,17 +97,17 @@ renderModel { zoom, time } texture { vertices, indices } =
         modelView =
             M4.mul view_ model
     in
-        GL.entityWith [ DepthTest.default, cullFace front ]
-            reflectionVert
-            reflectionFrag
-            (GL.indexedTriangles vertices indices)
-            { camera = camera, mvMat = modelView, texture = texture }
+    GL.entityWith [ DepthTest.default, cullFace front ]
+        reflectionVert
+        reflectionFrag
+        (GL.indexedTriangles vertices indices)
+        { camera = camera, mvMat = modelView, texture = texture }
 
 
 getCamera : Float -> Float -> ( Mat4, Mat4 )
 getCamera zoom t =
-    ( (M4.makePerspective 45 1 0.01 10000)
-    , (M4.makeLookAt (vec3 (zoom) (zoom / 2) (zoom)) (vec3 0 0 0) (vec3 0 1 0))
+    ( M4.makePerspective 45 1 0.01 10000
+    , M4.makeLookAt (vec3 zoom (zoom / 2) zoom) (vec3 0 0 0) (vec3 0 1 0)
     )
 
 
@@ -122,11 +123,10 @@ view model =
             Html.pre [] [ Html.text (meshErr ++ "\n\n\n" ++ reflectionErr) ]
 
         ( Err meshErr, Ok _ ) ->
-            Html.pre [] [ Html.text <| "Mesh error: " ++ meshErr]
+            Html.pre [] [ Html.text <| "Mesh error: " ++ meshErr ]
 
         ( Ok _, Err reflectionErr ) ->
-            Html.pre [] [ Html.text <| "Reflection error: " ++ reflectionErr]
-
+            Html.pre [] [ Html.text <| "Reflection error: " ++ reflectionErr ]
 
 
 
@@ -142,8 +142,11 @@ loadTexture url msg =
                     Ok t ->
                         msg (Ok t)
 
-                    Err e ->
-                        msg (Err ("Failed to load texture: " ++ Debug.toString e))
+                    Err LoadError ->
+                        msg (Err "Failed to load texture")
+
+                    Err (SizeError w h) ->
+                        msg (Err ("Invalid texture size: " ++ fromInt w ++ " x " ++ fromInt h))
             )
 
 

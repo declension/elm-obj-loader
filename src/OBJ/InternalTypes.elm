@@ -1,17 +1,9 @@
-module OBJ.InternalTypes exposing (Face(..), FaceTriangle(..), Group(..), Int2, Int3, Line(..), MeshT(..), MeshWithT, ThreeOrFour(..), VertexWithTextureAndTangentT, log)
+module OBJ.InternalTypes exposing (Face(..), FaceTriangle(..), Group(..), Int2, Int3, Line(..), MeshT(..), MeshWithT, ThreeOrFour(..), VertexWithTextureAndTangentT)
 
 import Array exposing (Array)
 import Math.Vector2 exposing (Vec2)
 import Math.Vector3 exposing (Vec3)
 import OBJ.Types exposing (..)
-
-
-log s a =
-    let
-        _ =
-            Debug.log s ()
-    in
-    a
 
 
 type MeshT
