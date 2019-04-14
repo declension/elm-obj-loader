@@ -1,7 +1,7 @@
 module ElmLogo exposing (CameraInfo, Model, Msg(..), Size, decodeMouse, getCamera, getDelta, initCmd, initModel, loadModel, loadTexture, main, models, onZoom, renderCullFace, renderModel, selectModel, subscriptions, update, view)
 
 import Browser
-import Browser.Events exposing (onAnimationFrame, onMouseDown, onMouseMove, onMouseUp, onResize)
+import Browser.Events exposing (onAnimationFrameDelta, onMouseDown, onMouseMove, onMouseUp, onResize)
 import Dict exposing (Dict)
 import Html exposing (Html, div, text)
 import Html.Attributes as Attr
@@ -97,7 +97,7 @@ type alias Size =
 
 
 type Msg
-    = Tick Posix
+    = Tick Float
     | LoadObj String (Result String (Dict String (Dict String Mesh)))
     | Zoom Float
     | MouseMove Int Int
@@ -118,7 +118,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick dt ->
-            ( { model | time = (posixToMillis dt |> toFloat) / 1000 }, Cmd.none )
+            ( { model | time = model.time + dt / 1000 }, Cmd.none )
 
         Zoom dy ->
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
@@ -272,7 +272,7 @@ subscriptions model =
           else
             []
          )
-            ++ [ onAnimationFrame Tick
+            ++ [ onAnimationFrameDelta Tick
                , onMouseUp (JD.succeed MouseUp)
                , onMouseDown (decodeMouse MouseDown)
                , onResize ResizeWindow
