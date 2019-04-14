@@ -6,8 +6,8 @@ import Dict exposing (Dict)
 import Math.Vector2 as V2 exposing (Vec2)
 import Math.Vector3 as V3 exposing (Vec3, vec3)
 import Math.Vector4 as V4 exposing (Vec4, vec4)
-import OBJ.Types exposing (..)
 import OBJ.InternalTypes exposing (..)
+import OBJ.Types exposing (..)
 
 
 compile config lines =
@@ -46,16 +46,15 @@ compileHelper state lines =
             compileHelper (insertLine l state) ls
 
 
-{-|
-this 'inserts' a line into the state.
+{-| This 'inserts' a line into the state.
 This means it manipulates the current state to reflect state changing commands
-and buils meshes on the fly.
+and builds meshes on the fly.
 -}
 insertLine line state =
     case line of
         Object s ->
             -- even though the specs doesn't give it any meaningful meaning,
-            -- I treat is exactely like a group statement.
+            -- I treat is exactly like a group statement.
             -- This is because blender uses o instead of g per default.
             addCurrentGroup state
                 |> (\st -> { st | currentGroupName = s })
@@ -105,7 +104,7 @@ triangulateFace f =
 
 
 addCurrentMesh state =
-    -- this adds the current mesh, to the current group.
+    -- Adds the current mesh to the current group.
     -- We also normalize all values here that need normalizing
     case state.currentMesh of
         Just m ->
@@ -120,6 +119,7 @@ addCurrentMesh state =
         _ ->
             state
 
+
 finalizeMesh : MeshT -> Mesh
 finalizeMesh mesh =
     case mesh of
@@ -130,7 +130,8 @@ finalizeMesh mesh =
             WithoutTexture m
 
         WithTextureAndTangentT m ->
-            WithTextureAndTangent {indices = m.indices, vertices = Array.foldr reducer [] m.vertices }
+            WithTextureAndTangent { indices = m.indices, vertices = Array.foldr reducer [] m.vertices }
+
 
 reducer : VertexWithTextureAndTangentT -> List VertexWithTextureAndTangent -> List VertexWithTextureAndTangent
 reducer { position, texCoord, normal, sdir, tdir } acc =
@@ -140,6 +141,7 @@ reducer { position, texCoord, normal, sdir, tdir } acc =
         w =
             if V3.dot (V3.cross normal sdir) tdir < 0 then
                 -1
+
             else
                 1
 
@@ -147,20 +149,22 @@ reducer { position, texCoord, normal, sdir, tdir } acc =
             -- I have not seen this anywhere, but I added it because I sometimes got (0,0,0)
             if V3.lengthSquared sdir /= 0 then
                 V3.toRecord <| V3.normalize (V3.sub sdir (V3.scale (V3.dot normal sdir) normal))
+
             else
                 V3.toRecord <| V3.cross (V3.normalize (V3.sub tdir (V3.scale (V3.dot normal tdir) normal))) normal
     in
-        { position = position
-        , texCoord = texCoord
-        , normal = normal
-        , tangent = vec4 x y z w
-        }
+    { position = position
+    , texCoord = texCoord
+    , normal = normal
+    , tangent = vec4 x y z w
+    }
         :: acc
 
 
 addCurrentGroup state =
     if Dict.isEmpty state.currentGroup then
         state
+
     else
         { state
             | groups = Dict.insert state.currentGroupName state.currentGroup state.groups
@@ -192,7 +196,7 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
                 newMesh =
                     WithTextureT { m | indices = newIs :: m.indices, vertices = m.vertices ++ newVs }
             in
-                { newState | currentMesh = Just newMesh }
+            { newState | currentMesh = Just newMesh }
 
         ( FTVertexTextureNormal ( v1, v2, v3 ), WithTextureAndTangentT m ) ->
             let
@@ -205,7 +209,7 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
                 newMesh =
                     WithTextureAndTangentT { m | indices = newIs :: m.indices, vertices = Array.append m.vertices newVs }
             in
-                { newState | currentMesh = Just newMesh }
+            { newState | currentMesh = Just newMesh }
 
         ( FTVertexNormal ( v1, v2, v3 ), WithoutTextureT m ) ->
             let
@@ -215,26 +219,25 @@ addFaceToMesh f mesh ({ vs, vts, vns, currentIndex } as state) =
                 newMesh =
                     WithoutTextureT { m | indices = newIs :: m.indices, vertices = m.vertices ++ newVs }
             in
-                { newState | currentMesh = Just newMesh }
+            { newState | currentMesh = Just newMesh }
 
         _ ->
             -- TODO: lift this error into a Result type
             Debug.log "ERROR: mixed face types in the model!" <|
-
-            {      config = { withTangents=False }
-                 , currentMesh = Nothing
-                 , currentGroup = Dict.empty
-                 , currentGroupName = "(error)"
-                 , currentMaterialName = "(error)"
-                 , vs = Array.empty
-                 , vts = Array.empty
-                 , vns = Array.empty
-                 , groups = Dict.empty
-                 , currentIndex = 0
-                 , knownVertexTextures = Dict.empty
-                 , knownVertexTexturesTangents = Dict.empty
-                 , knownVertex = Dict.empty}
-
+                { config = { withTangents = False }
+                , currentMesh = Nothing
+                , currentGroup = Dict.empty
+                , currentGroupName = "(error)"
+                , currentMaterialName = "(error)"
+                , vs = Array.empty
+                , vts = Array.empty
+                , vns = Array.empty
+                , groups = Dict.empty
+                , currentIndex = 0
+                , knownVertexTextures = Dict.empty
+                , knownVertexTexturesTangents = Dict.empty
+                , knownVertex = Dict.empty
+                }
 
 
 applyForFace f ( i1, i2, i3 ) s_0 =
@@ -248,7 +251,7 @@ applyForFace f ( i1, i2, i3 ) s_0 =
         ( s_3, vs_3, i_3 ) =
             f i3 s_2
     in
-        ( s_3, vs_1 ++ vs_2 ++ vs_3, ( i_3, i_2, i_1 ) )
+    ( s_3, vs_1 ++ vs_2 ++ vs_3, ( i_3, i_2, i_1 ) )
 
 
 applyForFaceA f ( i1, i2, i3 ) s_0 =
@@ -262,7 +265,7 @@ applyForFaceA f ( i1, i2, i3 ) s_0 =
         ( s_3, vs_3, i_3 ) =
             f i3 s_2
     in
-        ( s_3, Array.append (Array.append vs_1 vs_2) vs_3, ( i_3, i_2, i_1 ) )
+    ( s_3, Array.append (Array.append vs_1 vs_2) vs_3, ( i_3, i_2, i_1 ) )
 
 
 getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as index) { vs, vts, vns } =
@@ -273,7 +276,7 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
     case ( get3 ( pi1, pi2, pi3 ) vs vs vs, get3 ( ti1, ti2, ti3 ) vts vts vts ) of
         ( Just ( v1, v2, v3 ), Just ( w1, w2, w3 ) ) ->
             let
-                ( vv1, vv2, vv3) =
+                ( vv1, vv2, vv3 ) =
                     t3map V3.toRecord ( v1, v2, v3 )
 
                 ( ww1, ww2, ww3 ) =
@@ -294,6 +297,7 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
                 r =
                     if abs denom <= 0.000001 then
                         0.1
+
                     else
                         1 / denom
 
@@ -303,7 +307,7 @@ getFaceTangent (( ( pi1, ti1, ni1 ), ( pi2, ti2, ni2 ), ( pi3, ti3, ni3 ) ) as i
                 tdir =
                     vec3 ((s1 * x2 - s2 * x1) * r) ((s1 * y2 - s2 * y1) * r) ((s1 * z2 - s2 * z1) * r)
             in
-                ( sdir, tdir )
+            ( sdir, tdir )
 
         _ ->
             -- TODO: lift this error into a Result type
@@ -425,18 +429,20 @@ createMesh withTangents f =
     let
         emptyMeshT =
             { vertices = Array.empty, indices = [] }
+
         emptyMesh =
             { vertices = [], indices = [] }
     in
-        case f of
-            FTVertexTextureNormal _ ->
-                if withTangents then
-                    WithTextureAndTangentT emptyMeshT
-                else
-                    WithTextureT emptyMesh
+    case f of
+        FTVertexTextureNormal _ ->
+            if withTangents then
+                WithTextureAndTangentT emptyMeshT
 
-            FTVertexNormal _ ->
-                WithoutTextureT emptyMesh
+            else
+                WithTextureT emptyMesh
+
+        FTVertexNormal _ ->
+            WithoutTextureT emptyMesh
 
 
 

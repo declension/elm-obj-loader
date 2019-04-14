@@ -29,6 +29,7 @@ parseLineAcc line_ acc =
         Ok lines ->
             if canSkip line_ then
                 Ok lines
+
             else
                 parseLine line_
                     |> Result.andThen
@@ -102,30 +103,32 @@ usemtl =
 line : Parser s Line
 line =
     keep
-    (choice
-        [ map V vertex
-        , map Vt vertexTexture
-        , map Vn vertexNormal
-        , map F face
-        , map Object objectName
-        , map Group group
-        , map Smooth smooth
-        , map UseMtl usemtl
-        , map MtlLib mtllib
-        ])
+        (choice
+            [ map V vertex
+            , map Vt vertexTexture
+            , map Vn vertexNormal
+            , map F face
+            , map Object objectName
+            , map Group group
+            , map Smooth smooth
+            , map UseMtl usemtl
+            , map MtlLib mtllib
+            ]
+        )
         (regex "[ \t]*")
 
 
 face : Parser s Face
 face =
-    regex "f[ \t]+" |> keep
-        (choice
-            [ fVertexTextureNormal
-            , fVertexNormal
-            , fVertex
-            , fVertexTexture
-            ]
-        )
+    regex "f[ \t]+"
+        |> keep
+            (choice
+                [ fVertexTextureNormal
+                , fVertexNormal
+                , fVertex
+                , fVertexTexture
+                ]
+            )
 
 
 fVertex : Parser s a
@@ -242,6 +245,7 @@ betterFloat : Parser s Float
 betterFloat =
     map parseFloatOrZero <| regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
 
+
 parseFloatOrZero s =
     Result.withDefault 0 (JD.decodeString JD.float s)
 
@@ -267,15 +271,15 @@ formatError ms stream =
         padding =
             location.column + separatorOffset + 2
     in
-        "Parse error around line:\n\n"
-            ++ String.fromInt location.line
-            ++ separator
-            ++ location.source
-            ++ "\n"
-            ++ String.padLeft padding ' ' "^"
-            ++ "\nI expected one of the following:\n"
-            ++ expectationSeparator
-            ++ String.join expectationSeparator ms
+    "Parse error around line:\n\n"
+        ++ String.fromInt location.line
+        ++ separator
+        ++ location.source
+        ++ "\n"
+        ++ String.padLeft padding ' ' "^"
+        ++ "\nI expected one of the following:\n"
+        ++ expectationSeparator
+        ++ String.join expectationSeparator ms
 
 
 toInt : String -> Int

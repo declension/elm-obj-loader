@@ -6,33 +6,12 @@ import Math.Vector3 exposing (Vec3)
 import OBJ.Types exposing (..)
 
 
---
--- {- DEBUG -}
---
--- import Native.Time
---
---
--- debugNow : () -> Float
--- debugNow =
---     Native.Time.now
---
---
--- time : String -> (() -> a) -> a
--- time name f =
---     let
---         a =
---             debugNow ()
---     in
---         f ()
---             |> (\r -> log (name ++ ": " ++ toString (debugNow () - a) ++ " ms") r)
-
-
 log s a =
     let
         _ =
             Debug.log s ()
     in
-        a
+    a
 
 
 type MeshT
