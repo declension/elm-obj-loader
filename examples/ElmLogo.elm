@@ -118,7 +118,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick dt ->
-            ( { model | time = model.time + (posixToMillis dt |> toFloat) / 1000000000 }, Cmd.none )
+            ( { model | time = (posixToMillis dt |> toFloat) / 1000 }, Cmd.none )
 
         Zoom dy ->
             ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
@@ -168,8 +168,11 @@ renderModel model textureDiff textureNorm mesh =
         modelM =
             M4.makeTranslate (vec3 -1 0 0)
 
+        theta =
+            2 * model.time
+
         lightPos =
-            vec3 (0.5 * cos (2 * model.time)) (1 + 0.5 * sin (2 * model.time)) 0.5
+            vec3 (0.5 * cos theta) (1 + 0.5 * sin theta) 0.5
 
         uniforms =
             { camera = camera
