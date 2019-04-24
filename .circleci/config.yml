@@ -8,9 +8,9 @@ jobs:
       - checkout
 
       - run:
-        name: Build Elm
-        command: elm make
+          name: Build Elm
+          command: elm make
 
       - run:
-        name: Run Tests
-        command: elm-test
+          name: Run Tests
+          command: elm-test
