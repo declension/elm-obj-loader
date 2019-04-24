@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: eriktim/docker-elm-ci
+      - image: eriktim/elm-ci
 
     steps:
       - checkout

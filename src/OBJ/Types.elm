@@ -27,6 +27,7 @@ So the keys of this dictionary are:
     Dict GroupNameOrObjectName (Dict MaterialName Mesh)
 
 If no name is specified in the input file, "__default__" will be used instead.
+
 -}
 type alias ObjFile =
     Dict String (Dict String Mesh)
@@ -45,16 +46,22 @@ type Mesh
     | WithTextureAndTangent (MeshWith VertexWithTextureAndTangent)
 
 
+{-| Defines a mesh: vertices of any type, and a list of their integer indices
+-}
 type alias MeshWith a =
     { vertices : List a
     , indices : List ( Int, Int, Int )
     }
 
 
+{-| A 3D position with a normal
+-}
 type alias Vertex =
     { position : Vec3, normal : Vec3 }
 
 
+{-| A 3D position with a normal and a 2D texture position.
+-}
 type alias VertexWithTexture =
     { position : Vec3, texCoord : Vec2, normal : Vec3 }
 

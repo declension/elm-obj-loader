@@ -31,7 +31,7 @@ Only a small subset of the specification is supported though - specifically:
 * Smooth groups are ignored (`s n`).  
 * Only tris and quads are supported. (Tris might load slightly faster)    
 * No free-form curves / surfaces.    
-* No material library (`mtllib`) support.   
+* No material library ([mtllib](http://people.sc.fsu.edu/~jburkardt/data/mtl/mtl.html)) support.   
 * No negative indexing.   
 
 
