@@ -2,15 +2,15 @@ version: 2
 jobs:
   build:
     docker:
-      - image: eriktim/docker-elm-ci
+      - image: trenneman/elm-ci
 
     steps:
       - checkout
 
       - run:
-        name: Build Elm
-        command: elm make
+          name: Build Elm
+          command: elm make
 
       - run:
-        name: Run Tests
-        command: elm-test
+          name: Run Tests
+          command: elm-test

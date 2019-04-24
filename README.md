@@ -1,7 +1,9 @@
 elm-obj-loader
 ==============
 
-This is an Elm library for importing simple [Wavefront .obj][objSpecs] files into your WebGL application.
+[![CircleCI](https://circleci.com/gh/declension/elm-obj-loader.svg?style=svg)](https://circleci.com/gh/declension/elm-obj-loader)
+
+This is an Elm library for importing simple [Wavefront `.obj`][objSpecs] files into your WebGL application.
 
 It is currently Elm 0.19, though [the previous incarnation](https://package.elm-lang.org/packages/Zinggi/elm-obj-loader/) works for 0.18.
 
@@ -31,7 +33,7 @@ Only a small subset of the specification is supported though - specifically:
 * Smooth groups are ignored (`s n`).  
 * Only tris and quads are supported. (Tris might load slightly faster)    
 * No free-form curves / surfaces.    
-* No material library (`mtllib`) support.   
+* No material library ([mtllib](http://people.sc.fsu.edu/~jburkardt/data/mtl/mtl.html)) support.   
 * No negative indexing.   
 
 

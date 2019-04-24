@@ -1,9 +1,9 @@
 {
     "type": "package",
-    "name": "Zinggi/elm-obj-loader",
-    "summary": "Load wavefront .obj files in your WebGL scene.",
+    "name": "declension/elm-obj-loader",
+    "summary": "Load Wavefront .obj files in your WebGL scene.",
     "license": "MIT",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "exposed-modules": [
         "OBJ",
         "OBJ.Types"
