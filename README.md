@@ -1,31 +1,38 @@
-# elm-obj-loader
+elm-obj-loader
+==============
 
-This is a small library for importing [wavefront .obj][objSpecs] files into your WebGL application.
+This is an Elm library for importing simple [Wavefront .obj][objSpecs] files into your WebGL application.
 
-# Demo/Examples
+It is currently Elm 0.19, though [the previous incarnation](https://package.elm-lang.org/packages/Zinggi/elm-obj-loader/) works for 0.18.
+
+
+Examples
+--------
  * [Model viewer][modelViewer]
  * [Suzanne from Blender][suzanne]
 
-[Src](/examples)
+See the [demo source](/examples).
 
-# Limitations
-Only a small subset of the .obj file specification is supported.
 
-The easiest is to export/convert your model from Blender or another 3D content creation tool as an .obj file.
+Usage
+-----
+* Export / convert your model from Blender or other 3D content creation tool as an `.obj` file.
+* The default export options from Blender work fine.
+* Make sure you keep _Write Normals_ selected.
 
-The default export options from blender work fine. Make sure you keep 'Write Normals' selected.
 
+Limitations
+-----------
+ 
 Completely supported face types are those with vertex position, normals and optionally vertex texture coordinates. (`v`, `vn`, `vt`)
+Only a small subset of the specification is supported though - specifically:
 
-Smooth groups are ignored (`s n`).  
-Your model needs vertex normals (`vn`).  
-
-Only tris and quads are supported. (Tris might load slightly faster)    
-No free-form curves/surfaces.    
-No material library (mtllib) support.   
-No negative indexing.   
-
-
+* Your model needs vertex normals (`vn`).
+* Smooth groups are ignored (`s n`).  
+* Only tris and quads are supported. (Tris might load slightly faster)    
+* No free-form curves / surfaces.    
+* No material library (`mtllib`) support.   
+* No negative indexing.   
 
 
 
