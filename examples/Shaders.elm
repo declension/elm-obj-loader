@@ -87,7 +87,7 @@ void main()
     vec3 posWorld = (modelMatrix * pos).xyz;
 
     // Tangent, Bitangent, Normal space matrix TBN
-    // this isn't entirely correct, it should use the normal matrix
+    // this is not entirely correct, it should use the normal matrix
     // In this special case it works out well,
     // since my model matrix does not contain any rotation or translation.
     // http://www.lighthouse3d.com/tutorials/glsl-12-tutorial/the-normal-matrix/

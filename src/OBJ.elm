@@ -1,4 +1,8 @@
-module OBJ exposing (..)
+module OBJ exposing
+    ( loadMeshWithoutTexture, loadMesh, loadMeshWithTangent
+    , loadObjFile, loadObjFileWith, Settings, defaultSettings
+    , parseObjStringWith
+    )
 
 {-|
 
@@ -39,18 +43,12 @@ if your files contain multiple groups or materials.
 -}
 
 import Dict exposing (Dict)
-import Http
-import OBJ.Assembler exposing (compile)
-import OBJ.Parser exposing (parse)
-import OBJ.Types exposing (Mesh, ObjFile)
-import Task
-
-
---
-
+import Http exposing (Response)
 import OBJ.Assembler exposing (compile)
 import OBJ.Parser exposing (parse)
 import OBJ.Types exposing (..)
+import String exposing (fromInt)
+import Task
 
 
 {-| Load a model that doesn't have texture coordinates.
@@ -61,7 +59,7 @@ loadMeshWithoutTexture url msg =
         (\res ->
             case res of
                 Ok f ->
-                    case (Dict.values f |> List.map Dict.values) of
+                    case Dict.values f |> List.map Dict.values of
                         [ [ WithoutTexture m ] ] ->
                             msg (Ok m)
 
@@ -81,7 +79,7 @@ loadMesh url msg =
         (\res ->
             case res of
                 Ok f ->
-                    case (Dict.values f |> List.map Dict.values) of
+                    case Dict.values f |> List.map Dict.values of
                         [ [ WithTexture m ] ] ->
                             msg (Ok m)
 
@@ -103,7 +101,7 @@ loadMeshWithTangent url msg =
         (\res ->
             case res of
                 Ok f ->
-                    case (Dict.values f |> List.map Dict.values) of
+                    case Dict.values f |> List.map Dict.values of
                         [ [ WithTextureAndTangent m ] ] ->
                             msg (Ok m)
 
@@ -146,7 +144,7 @@ loadObjFileWith settings url msg =
             (\s ->
                 parseObjStringWith settings s |> Task.succeed
             )
-        |> Task.onError (\e -> Task.succeed (Err ("failed to load:\n" ++ toString e)))
+        |> Task.onError (\e -> Task.succeed (Err <| httpErrorFor e))
         |> Task.attempt
             (\r ->
                 case r of
@@ -167,3 +165,22 @@ parseObjStringWith : Settings -> String -> Result String ObjFile
 parseObjStringWith config input =
     parse input
         |> Result.map (compile config)
+
+
+httpErrorFor : Http.Error -> String
+httpErrorFor e =
+    case e of
+        Http.BadUrl url ->
+            "Bad URL: " ++ url
+
+        Http.Timeout ->
+            "Timed out"
+
+        Http.NetworkError ->
+            "Network error"
+
+        Http.BadStatus response ->
+            "Failed"
+
+        Http.BadPayload string response ->
+            fromInt response.status.code ++ ": invalid request in " ++ response.body

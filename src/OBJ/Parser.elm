@@ -1,13 +1,14 @@
-module OBJ.Parser exposing (..)
+module OBJ.Parser exposing (betterFloat, canSkip, comment, fVertex, fVertexNormal, fVertexTexture, fVertexTextureNormal, face, file, formatError, fourValues, group, ignoreZ, ignoredLines, int__int, int_int, int_int_int, line, mtllib, objectName, parse, parseLine, parseLineAcc, smooth, spaces, threeOrFourValues, threeValues, toInt, usemtl, vector2, vector3, vertex, vertexNormal, vertexTexture)
 
-import Math.Vector3 as V3 exposing (Vec3, vec3)
-import Math.Vector2 as V2 exposing (Vec2, vec2)
 import Combine exposing (..)
-import Json.Decode as JD
-import Combine.Num exposing (..)
 import Combine.Char exposing (..)
+import Combine.Num exposing (..)
+import Json.Decode as JD
+import Math.Vector2 exposing (Vec2, vec2)
+import Math.Vector3 as V3 exposing (Vec3, toRecord, vec3)
 import OBJ.InternalTypes exposing (..)
-import Regex exposing (find, HowMany(..))
+import Regex
+
 
 
 -- TODO: figure out how nice error messages work
@@ -23,13 +24,14 @@ parse input =
 
 
 parseLineAcc : String -> Result String (List Line) -> Result String (List Line)
-parseLineAcc line acc =
+parseLineAcc line_ acc =
     case acc of
         Ok lines ->
-            if canSkip line then
+            if canSkip line_ then
                 Ok lines
+
             else
-                parseLine line
+                parseLine line_
                     |> Result.andThen
                         (\l ->
                             Ok (l :: lines)
@@ -39,8 +41,16 @@ parseLineAcc line acc =
             Err e
 
 
-canSkip line =
-    Regex.contains (Regex.regex "^((\\s*)|(\\s*#.*\\r?))$") line
+canSkip : String -> Bool
+canSkip =
+    regexMatches "^((\\s*)|(\\s*#.*\\r?))$"
+
+
+regexMatches : String -> String -> Bool
+regexMatches regexStr str =
+    Regex.fromString regexStr
+        |> Maybe.map (\regex -> Regex.contains regex str)
+        |> Maybe.withDefault False
 
 
 parseLine l =
@@ -54,142 +64,166 @@ parseLine l =
 
 file : Parser s (List Line)
 file =
-    (many ignoredLines)
-        *> sepBy (many1 ignoredLines)
-            line
-        <* (many ignoredLines)
-        <* end
+    ignore (many ignoredLines) (sepBy (many1 ignoredLines) line)
+        |> ignore (many ignoredLines)
+        |> ignore end
 
 
 ignoredLines : Parser s ()
 ignoredLines =
-    (skip eol) <|> (skip comment)
+    or (skip eol) (skip comment)
 
 
 objectName : Parser s String
 objectName =
-    regex "o[ \t]+" *> regex ".+"
+    regex "o[ \t]+" |> keep (regex ".+")
 
 
 mtllib : Parser s String
 mtllib =
-    regex "mtllib[ \t]+" *> regex ".+"
+    regex "mtllib[ \t]+" |> keep (regex ".+")
 
 
 group : Parser s String
 group =
-    (regex "g[ \t]+" *> regex ".+")
-        <|> (char 'g' *> succeed "")
+    or (regex "g[ \t]+" |> keep (regex ".+"))
+        (char 'g' |> keep (succeed ""))
 
 
 smooth : Parser s String
 smooth =
-    regex "s[ \t]+" *> regex ".+"
+    regex "s[ \t]+" |> keep (regex ".+")
 
 
 usemtl : Parser s String
 usemtl =
-    regex "usemtl[ \t]+" *> regex ".+"
+    regex "usemtl[ \t]+" |> keep (regex ".+")
 
 
 line : Parser s Line
 line =
-    choice
-        [ V <$> vertex
-        , Vt <$> vertexTexture
-        , Vn <$> vertexNormal
-        , F <$> face
-        , Object <$> objectName
-        , Group <$> group
-        , Smooth <$> smooth
-        , UseMtl <$> usemtl
-        , MtlLib <$> mtllib
-        ]
-        <* regex "[ \t]*"
+    keep
+        (choice
+            [ map V vertex
+            , map Vt vertexTexture
+            , map Vn vertexNormal
+            , map F face
+            , map Object objectName
+            , map Group group
+            , map Smooth smooth
+            , map UseMtl usemtl
+            , map MtlLib mtllib
+            ]
+        )
+        (regex "[ \t]*")
 
 
 face : Parser s Face
 face =
     regex "f[ \t]+"
-        *> choice
-            [ fVertexTextureNormal
-            , fVertexNormal
-            , fVertex
-            , fVertexTexture
-            ]
+        |> keep
+            (choice
+                [ fVertexTextureNormal
+                , fVertexNormal
+                , fVertex
+                , fVertexTexture
+                ]
+            )
 
 
 fVertex : Parser s a
 fVertex =
-    threeOrFourValues int
-        *> fail "Models with no precalculated vertex normals are not supported!"
+    keep (fail "Models with no precalculated vertex normals are not supported!") (threeOrFourValues int)
 
 
 fVertexTexture : Parser s a
 fVertexTexture =
-    threeOrFourValues int_int
-        *> fail "Models with no precalculated vertex normals are not supported!"
+    keep (fail "Models with no precalculated vertex normals are not supported!") (threeOrFourValues int_int)
 
 
 fVertexTextureNormal : Parser s Face
 fVertexTextureNormal =
-    FVertexTextureNormal <$> threeOrFourValues int_int_int
+    map FVertexTextureNormal <| threeOrFourValues int_int_int
 
 
 fVertexNormal : Parser s Face
 fVertexNormal =
-    FVertexNormal <$> threeOrFourValues int__int
+    map FVertexNormal <| threeOrFourValues int__int
 
 
 threeValues : (a -> a -> a -> b) -> Parser s a -> Parser s b
-threeValues tagger vtype =
-    tagger <$> (vtype) <*> (spaces *> vtype) <*> (spaces *> vtype)
+threeValues tagger parser =
+    parser
+        |> map tagger
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
 
 
 fourValues : (a -> a -> a -> a -> b) -> Parser s a -> Parser s b
-fourValues tagger vtype =
-    tagger <$> (vtype) <*> (spaces *> vtype) <*> (spaces *> vtype) <*> (spaces *> vtype)
+fourValues tagger parser =
+    parser
+        |> map tagger
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
+        |> andMap (spaces |> keep parser)
 
 
 threeOrFourValues : Parser s a -> Parser s (ThreeOrFour a)
-threeOrFourValues elements =
-    (Four <$> (fourValues (,,,) elements))
-        <|> (Three <$> (threeValues (,,) elements))
+threeOrFourValues elementType =
+    or (map Four <| fourValues (\a b c d -> { a = a, b = b, c = c, d = d }) elementType)
+        (map Three <| threeValues (\a b c -> { a = a, b = b, c = c }) elementType)
 
 
 int_int : Parser s ( Int, Int )
 int_int =
-    (,) <$> int <*> (string "/" *> int)
+    int
+        |> map tuple2
+        |> andMap (string "/" |> keep int)
 
 
 int_int_int : Parser s ( Int, Int, Int )
 int_int_int =
-    (,,) <$> int <*> (string "/" *> int) <*> (string "/" *> int)
+    int
+        |> map tuple3
+        |> andMap (string "/" |> keep int)
+        |> andMap (string "/" |> keep int)
+
+
+tuple2 : a -> b -> ( a, b )
+tuple2 a b =
+    ( a, b )
+
+
+tuple3 : a -> b -> c -> ( a, b, c )
+tuple3 a b c =
+    ( a, b, c )
 
 
 int__int : Parser s ( Int, Int )
 int__int =
-    (,) <$> int <*> (string "//" *> int)
+    int
+        |> map tuple2
+        |> andMap (string "//" |> keep int)
 
 
 vertexNormal : Parser s Vec3
 vertexNormal =
-    regex "vn[ \t]+" *> (V3.normalize <$> vector3)
+    regex "vn[ \t]+" |> keep (map V3.normalize vector3)
 
 
 vertexTexture : Parser s Vec2
 vertexTexture =
-    regex "vt[ \t]+" *> ((ignoreZ <$> vector3) <|> vector2)
+    regex "vt[ \t]+" |> keep (or (map ignoreZ vector3) vector2)
 
 
 vertex : Parser s Vec3
 vertex =
-    regex "v[ \t]+" *> vector3
+    regex "v[ \t]+" |> keep vector3
 
 
 comment : Parser s String
 comment =
-    regex "#" *> regex ".*"
+    regex "#" |> keep (regex ".*")
 
 
 vector3 : Parser s Vec3
@@ -204,12 +238,16 @@ spaces =
 
 vector2 : Parser s Vec2
 vector2 =
-    vec2 <$> betterFloat <*> (spaces *> betterFloat)
+    betterFloat |> map vec2 |> andMap (spaces |> keep betterFloat)
 
 
 betterFloat : Parser s Float
 betterFloat =
-    (\s -> Result.withDefault 0 (JD.decodeString JD.float s)) <$> regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
+    map parseFloatOrZero <| regex "[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?"
+
+
+parseFloatOrZero s =
+    Result.withDefault 0 (JD.decodeString JD.float s)
 
 
 formatError : List String -> InputStream -> String
@@ -233,26 +271,26 @@ formatError ms stream =
         padding =
             location.column + separatorOffset + 2
     in
-        "Parse error around line:\n\n"
-            ++ toString location.line
-            ++ separator
-            ++ location.source
-            ++ "\n"
-            ++ String.padLeft padding ' ' "^"
-            ++ "\nI expected one of the following:\n"
-            ++ expectationSeparator
-            ++ String.join expectationSeparator ms
+    "Parse error around line:\n\n"
+        ++ String.fromInt location.line
+        ++ separator
+        ++ location.source
+        ++ "\n"
+        ++ String.padLeft padding ' ' "^"
+        ++ "\nI expected one of the following:\n"
+        ++ expectationSeparator
+        ++ String.join expectationSeparator ms
 
 
 toInt : String -> Int
 toInt s =
-    String.toInt s |> Result.withDefault 0
+    Maybe.withDefault 0 <| String.toInt s
 
 
 ignoreZ : Vec3 -> Vec2
 ignoreZ v =
     let
-        ( x, y, _ ) =
-            V3.toTuple v
+        { x, y, z } =
+            toRecord v
     in
-        vec2 x y
+    vec2 x y
