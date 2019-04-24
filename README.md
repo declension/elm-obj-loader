@@ -1,6 +1,8 @@
 elm-obj-loader
 ==============
 
+[![CircleCI](https://circleci.com/gh/declension/elm-obj-loader.svg?style=svg)](https://circleci.com/gh/declension/elm-obj-loader)
+
 This is an Elm library for importing simple [Wavefront .obj][objSpecs] files into your WebGL application.
 
 It is currently Elm 0.19, though [the previous incarnation](https://package.elm-lang.org/packages/Zinggi/elm-obj-loader/) works for 0.18.
