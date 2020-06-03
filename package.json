@@ -13,6 +13,8 @@
     "elm-test": "0.19.1"
   },
   "scripts": {
-    "test": "elm-test tests"
+    "test": "elm-test tests",
+    "elm": "node_modules/.bin/elm",
+    "build-examples": "cd examples && npx elm make Suzanne.elm --output suzanne.html && npx elm make ElmLogo.elm --output elm-logo.html"
   }
 }
