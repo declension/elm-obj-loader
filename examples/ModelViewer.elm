@@ -1,4 +1,4 @@
-module ElmLogo exposing (CameraInfo, Model, Msg(..), Size, decodeMouse, getCamera, getDelta, initCmd, initModel, loadModel, loadTexture, main, models, onZoom, renderCullFace, renderModel, selectModel, subscriptions, update, view)
+module ModelViewer exposing (CameraInfo, Model, Msg(..), Size, decodeMouse, getCamera, getDelta, initCmd, initModel, loadModel, loadTexture, main, models, onZoom, renderCullFace, renderModel, selectModel, subscriptions, update, view)
 
 import Browser
 import Browser.Events exposing (onAnimationFrameDelta, onMouseDown, onMouseMove, onMouseUp, onResize)

@@ -26,8 +26,6 @@ jobs:
     - name: Build Examples
       run: npm run build-examples
 
-    - run: ls -l dist/
-
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
       with:

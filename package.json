@@ -16,6 +16,6 @@
     "test": "elm-test tests",
     "elm": "node_modules/.bin/elm",
     "clean": "rm -rf dist/",
-    "build-examples": "npm run clean && cp -r examples/ dist/ && cd dist && npx elm make Suzanne.elm --output suzanne.html && npx elm make ElmLogo.elm --output elm-logo.html && rm -rf *.elm elm-stuff/"
+    "build-examples": "npm run clean && cp -r examples/ dist/ && cd dist && npx elm make Suzanne.elm --output suzanne.html && npx elm make ModelViewer.elm --output model-viewer.html && rm -rf *.elm elm-stuff/"
   }
 }

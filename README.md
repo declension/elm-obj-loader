@@ -37,6 +37,6 @@ Only a small subset of the specification is supported though - specifically:
 * No negative indexing.   
 
 
-[suzanne]: https://zinggi.github.io/randomDemos/webgl/objLoader_simple.html
-[modelViewer]: https://zinggi.github.io/randomDemos/webgl/objLoader_modelViewer.html
+[suzanne]: https://declension.github.io/elm-obj-loader/suzanne.html
+[modelViewer]: https://declension.github.io/elm-obj-loader/model-viewer.html
 [objSpecs]: http://www.martinreddy.net/gfx/3d/OBJ.spec
