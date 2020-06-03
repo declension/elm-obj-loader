@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>ElmLogo</title>
+  <title>ModelViewer</title>
   <style>body { padding: 0; margin: 0; }</style>
 </head>
 
@@ -7155,14 +7155,14 @@ var $elm$core$Task$perform = F2(
 				A2($elm$core$Task$map, toMessage, task)));
 	});
 var $elm$browser$Browser$element = _Browser_element;
-var $author$project$ElmLogo$DiffTextureLoaded = function (a) {
+var $author$project$ModelViewer$DiffTextureLoaded = function (a) {
 	return {$: 'DiffTextureLoaded', a: a};
 };
-var $author$project$ElmLogo$NormTextureLoaded = function (a) {
+var $author$project$ModelViewer$NormTextureLoaded = function (a) {
 	return {$: 'NormTextureLoaded', a: a};
 };
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
-var $author$project$ElmLogo$LoadObj = F2(
+var $author$project$ModelViewer$LoadObj = F2(
 	function (a, b) {
 		return {$: 'LoadObj', a: a, b: b};
 	});
@@ -9606,13 +9606,13 @@ var $author$project$OBJ$loadObjFileWith = F3(
 					$elm$http$Http$toTask(
 						$elm$http$Http$getString(url)))));
 	});
-var $author$project$ElmLogo$loadModel = F2(
+var $author$project$ModelViewer$loadModel = F2(
 	function (withTangents, url) {
 		return A3(
 			$author$project$OBJ$loadObjFileWith,
 			{withTangents: withTangents},
 			url,
-			$author$project$ElmLogo$LoadObj(url));
+			$author$project$ModelViewer$LoadObj(url));
 	});
 var $elm_explorations$webgl$WebGL$Texture$Resize = function (a) {
 	return {$: 'Resize', a: a};
@@ -9647,7 +9647,7 @@ var $elm_explorations$webgl$WebGL$Texture$loadWith = F2(
 		return A4(expand, magnify, minify, horizontalWrap, verticalWrap);
 	});
 var $elm_explorations$webgl$WebGL$Texture$load = $elm_explorations$webgl$WebGL$Texture$loadWith($elm_explorations$webgl$WebGL$Texture$defaultOptions);
-var $author$project$ElmLogo$loadTexture = F2(
+var $author$project$ModelViewer$loadTexture = F2(
 	function (url, msg) {
 		return A2(
 			$elm$core$Task$attempt,
@@ -9673,19 +9673,19 @@ var $author$project$ElmLogo$loadTexture = F2(
 			},
 			$elm_explorations$webgl$WebGL$Texture$load(url));
 	});
-var $author$project$ElmLogo$initCmd = $elm$core$Platform$Cmd$batch(
+var $author$project$ModelViewer$initCmd = $elm$core$Platform$Cmd$batch(
 	_List_fromArray(
 		[
-			A2($author$project$ElmLogo$loadModel, true, 'meshes/elmLogo.obj'),
-			A2($author$project$ElmLogo$loadTexture, 'textures/elmLogoDiffuse.png', $author$project$ElmLogo$DiffTextureLoaded),
-			A2($author$project$ElmLogo$loadTexture, 'textures/elmLogoNorm.png', $author$project$ElmLogo$NormTextureLoaded)
+			A2($author$project$ModelViewer$loadModel, true, 'meshes/elmLogo.obj'),
+			A2($author$project$ModelViewer$loadTexture, 'textures/elmLogoDiffuse.png', $author$project$ModelViewer$DiffTextureLoaded),
+			A2($author$project$ModelViewer$loadTexture, 'textures/elmLogoNorm.png', $author$project$ModelViewer$NormTextureLoaded)
 		]));
-var $author$project$ElmLogo$Size = F2(
+var $author$project$ModelViewer$Size = F2(
 	function (width, height) {
 		return {height: height, width: width};
 	});
 var $elm$core$Basics$pi = _Basics_pi;
-var $author$project$ElmLogo$initModel = {
+var $author$project$ModelViewer$initModel = {
 	currentModel: 'meshes/elmLogo.obj',
 	diffText: $elm$core$Result$Err('Loading texture...'),
 	isDown: false,
@@ -9694,30 +9694,30 @@ var $author$project$ElmLogo$initModel = {
 	mouseDelta: A2($elm_explorations$linear_algebra$Math$Vector2$vec2, 0, $elm$core$Basics$pi / 2),
 	normText: $elm$core$Result$Err('Loading texture...'),
 	time: 0,
-	windowSize: A2($author$project$ElmLogo$Size, 800, 600),
+	windowSize: A2($author$project$ModelViewer$Size, 800, 600),
 	withTangent: true,
 	zoom: 5
 };
-var $author$project$ElmLogo$MouseDown = F2(
+var $author$project$ModelViewer$MouseDown = F2(
 	function (a, b) {
 		return {$: 'MouseDown', a: a, b: b};
 	});
-var $author$project$ElmLogo$MouseMove = F2(
+var $author$project$ModelViewer$MouseMove = F2(
 	function (a, b) {
 		return {$: 'MouseMove', a: a, b: b};
 	});
-var $author$project$ElmLogo$MouseUp = {$: 'MouseUp'};
-var $author$project$ElmLogo$ResizeWindow = F2(
+var $author$project$ModelViewer$MouseUp = {$: 'MouseUp'};
+var $author$project$ModelViewer$ResizeWindow = F2(
 	function (a, b) {
 		return {$: 'ResizeWindow', a: a, b: b};
 	});
-var $author$project$ElmLogo$Tick = function (a) {
+var $author$project$ModelViewer$Tick = function (a) {
 	return {$: 'Tick', a: a};
 };
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$json$Json$Decode$field = _Json_decodeField;
 var $elm$json$Json$Decode$int = _Json_decodeInt;
-var $author$project$ElmLogo$decodeMouse = function (mapper) {
+var $author$project$ModelViewer$decodeMouse = function (mapper) {
 	return A3(
 		$elm$json$Json$Decode$map2,
 		mapper,
@@ -10158,22 +10158,22 @@ var $elm$browser$Browser$Events$onResize = function (func) {
 				A2($elm$json$Json$Decode$field, 'innerWidth', $elm$json$Json$Decode$int),
 				A2($elm$json$Json$Decode$field, 'innerHeight', $elm$json$Json$Decode$int))));
 };
-var $author$project$ElmLogo$subscriptions = function (model) {
+var $author$project$ModelViewer$subscriptions = function (model) {
 	return $elm$core$Platform$Sub$batch(
 		_Utils_ap(
 			model.isDown ? _List_fromArray(
 				[
 					$elm$browser$Browser$Events$onMouseMove(
-					$author$project$ElmLogo$decodeMouse($author$project$ElmLogo$MouseMove))
+					$author$project$ModelViewer$decodeMouse($author$project$ModelViewer$MouseMove))
 				]) : _List_Nil,
 			_List_fromArray(
 				[
-					$elm$browser$Browser$Events$onAnimationFrameDelta($author$project$ElmLogo$Tick),
+					$elm$browser$Browser$Events$onAnimationFrameDelta($author$project$ModelViewer$Tick),
 					$elm$browser$Browser$Events$onMouseUp(
-					$elm$json$Json$Decode$succeed($author$project$ElmLogo$MouseUp)),
+					$elm$json$Json$Decode$succeed($author$project$ModelViewer$MouseUp)),
 					$elm$browser$Browser$Events$onMouseDown(
-					$author$project$ElmLogo$decodeMouse($author$project$ElmLogo$MouseDown)),
-					$elm$browser$Browser$Events$onResize($author$project$ElmLogo$ResizeWindow)
+					$author$project$ModelViewer$decodeMouse($author$project$ModelViewer$MouseDown)),
+					$elm$browser$Browser$Events$onResize($author$project$ModelViewer$ResizeWindow)
 				])));
 };
 var $elm$core$Basics$clamp = F3(
@@ -10182,7 +10182,7 @@ var $elm$core$Basics$clamp = F3(
 	});
 var $elm_explorations$linear_algebra$Math$Vector2$getX = _MJS_v2getX;
 var $elm_explorations$linear_algebra$Math$Vector2$getY = _MJS_v2getY;
-var $author$project$ElmLogo$getDelta = F3(
+var $author$project$ModelViewer$getDelta = F3(
 	function (curr, lastP, delta) {
 		return A2(
 			$elm_explorations$linear_algebra$Math$Vector2$vec2,
@@ -10194,7 +10194,7 @@ var $author$project$ElmLogo$getDelta = F3(
 				(($elm_explorations$linear_algebra$Math$Vector2$getY(curr) - $elm_explorations$linear_algebra$Math$Vector2$getY(lastP)) / 100) + $elm_explorations$linear_algebra$Math$Vector2$getY(delta)));
 	});
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
-var $author$project$ElmLogo$update = F2(
+var $author$project$ModelViewer$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
 			case 'Tick':
@@ -10217,14 +10217,14 @@ var $author$project$ElmLogo$update = F2(
 				var url = msg.a;
 				return _Utils_Tuple2(
 					model,
-					A2($author$project$ElmLogo$loadModel, model.withTangent, url));
+					A2($author$project$ModelViewer$loadModel, model.withTangent, url));
 			case 'SetUseTangent':
 				var t = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
 						{withTangent: t}),
-					A2($author$project$ElmLogo$loadModel, t, model.currentModel));
+					A2($author$project$ModelViewer$loadModel, t, model.currentModel));
 			case 'LoadObj':
 				var url = msg.a;
 				var mesh = msg.b;
@@ -10273,7 +10273,7 @@ var $author$project$ElmLogo$update = F2(
 						model,
 						{
 							lastMousePos: pos,
-							mouseDelta: A3($author$project$ElmLogo$getDelta, pos, model.lastMousePos, model.mouseDelta)
+							mouseDelta: A3($author$project$ModelViewer$getDelta, pos, model.lastMousePos, model.mouseDelta)
 						}),
 					$elm$core$Platform$Cmd$none);
 			default:
@@ -10317,7 +10317,7 @@ var $elm$html$Html$Attributes$height = function (n) {
 		'height',
 		$elm$core$String$fromInt(n));
 };
-var $author$project$ElmLogo$Zoom = function (a) {
+var $author$project$ModelViewer$Zoom = function (a) {
 	return {$: 'Zoom', a: a};
 };
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
@@ -10331,19 +10331,19 @@ var $elm$html$Html$Events$on = F2(
 			event,
 			$elm$virtual_dom$VirtualDom$Normal(decoder));
 	});
-var $author$project$ElmLogo$onZoom = A2(
+var $author$project$ModelViewer$onZoom = A2(
 	$elm$html$Html$Events$on,
 	'wheel',
 	A2(
 		$elm$json$Json$Decode$map,
-		$author$project$ElmLogo$Zoom,
+		$author$project$ModelViewer$Zoom,
 		A2($elm$json$Json$Decode$field, 'deltaY', $elm$json$Json$Decode$float)));
 var $elm$core$Basics$cos = _Basics_cos;
 var $elm_explorations$linear_algebra$Math$Matrix4$makeLookAt = _MJS_m4x4makeLookAt;
 var $elm_explorations$linear_algebra$Math$Matrix4$makePerspective = _MJS_m4x4makePerspective;
 var $elm_explorations$linear_algebra$Math$Matrix4$mul = _MJS_m4x4mul;
 var $elm$core$Basics$sin = _Basics_sin;
-var $author$project$ElmLogo$getCamera = function (_v0) {
+var $author$project$ModelViewer$getCamera = function (_v0) {
 	var mouseDelta = _v0.mouseDelta;
 	var zoom = _v0.zoom;
 	var windowSize = _v0.windowSize;
@@ -10483,7 +10483,7 @@ var $elm_explorations$webgl$WebGL$Settings$FaceMode = function (a) {
 	return {$: 'FaceMode', a: a};
 };
 var $elm_explorations$webgl$WebGL$Settings$front = $elm_explorations$webgl$WebGL$Settings$FaceMode(1028);
-var $author$project$ElmLogo$renderCullFace = $elm_explorations$webgl$WebGL$entityWith(
+var $author$project$ModelViewer$renderCullFace = $elm_explorations$webgl$WebGL$entityWith(
 	_List_fromArray(
 		[
 			$elm_explorations$webgl$WebGL$Settings$DepthTest$default,
@@ -10499,7 +10499,7 @@ var $author$project$Shaders$simpleVert = {
 	attributes: {normal: 'normal', position: 'position'},
 	uniforms: {lightPosition: 'lightPosition', modelMatrix: 'modelMatrix', modelViewProjectionMatrix: 'modelViewProjectionMatrix', viewPosition: 'viewPosition'}
 };
-var $author$project$ElmLogo$renderModel = F4(
+var $author$project$ModelViewer$renderModel = F4(
 	function (model, textureDiff, textureNorm, mesh) {
 		var theta = 2 * model.time;
 		var modelM = $elm_explorations$linear_algebra$Math$Matrix4$makeTranslate(
@@ -10509,7 +10509,7 @@ var $author$project$ElmLogo$renderModel = F4(
 			0.5 * $elm$core$Basics$cos(theta),
 			1 + (0.5 * $elm$core$Basics$sin(theta)),
 			0.5);
-		var camera = $author$project$ElmLogo$getCamera(model);
+		var camera = $author$project$ModelViewer$getCamera(model);
 		var uniforms = {
 			camera: camera,
 			lightPosition: lightPos,
@@ -10525,7 +10525,7 @@ var $author$project$ElmLogo$renderModel = F4(
 				var vertices = mesh.a.vertices;
 				var indices = mesh.a.indices;
 				return A4(
-					$author$project$ElmLogo$renderCullFace,
+					$author$project$ModelViewer$renderCullFace,
 					$author$project$Shaders$simpleVert,
 					$author$project$Shaders$simpleFrag,
 					A2($elm_explorations$webgl$WebGL$indexedTriangles, vertices, indices),
@@ -10534,7 +10534,7 @@ var $author$project$ElmLogo$renderModel = F4(
 				var vertices = mesh.a.vertices;
 				var indices = mesh.a.indices;
 				return A4(
-					$author$project$ElmLogo$renderCullFace,
+					$author$project$ModelViewer$renderCullFace,
 					$author$project$Shaders$noNormalVert,
 					$author$project$Shaders$noNormalFrag,
 					A2($elm_explorations$webgl$WebGL$indexedTriangles, vertices, indices),
@@ -10543,17 +10543,17 @@ var $author$project$ElmLogo$renderModel = F4(
 				var vertices = mesh.a.vertices;
 				var indices = mesh.a.indices;
 				return A4(
-					$author$project$ElmLogo$renderCullFace,
+					$author$project$ModelViewer$renderCullFace,
 					$author$project$Shaders$normalVert,
 					$author$project$Shaders$normalFrag,
 					A2($elm_explorations$webgl$WebGL$indexedTriangles, vertices, indices),
 					uniforms);
 		}
 	});
-var $author$project$ElmLogo$SelectMesh = function (a) {
+var $author$project$ModelViewer$SelectMesh = function (a) {
 	return {$: 'SelectMesh', a: a};
 };
-var $author$project$ElmLogo$SetUseTangent = function (a) {
+var $author$project$ModelViewer$SetUseTangent = function (a) {
 	return {$: 'SetUseTangent', a: a};
 };
 var $elm$json$Json$Encode$bool = _Json_wrap;
@@ -10566,7 +10566,7 @@ var $elm$html$Html$Attributes$boolProperty = F2(
 	});
 var $elm$html$Html$Attributes$checked = $elm$html$Html$Attributes$boolProperty('checked');
 var $elm$html$Html$input = _VirtualDom_node('input');
-var $author$project$ElmLogo$models = _List_fromArray(
+var $author$project$ModelViewer$models = _List_fromArray(
 	['meshes/elmLogo.obj', 'meshes/suzanneNoUV.obj']);
 var $elm$json$Json$Decode$at = F2(
 	function (fields, decoder) {
@@ -10628,7 +10628,7 @@ var $elm$html$Html$Attributes$stringProperty = F2(
 	});
 var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
-var $author$project$ElmLogo$selectModel = function (model) {
+var $author$project$ModelViewer$selectModel = function (model) {
 	return A2(
 		$elm$html$Html$div,
 		_List_fromArray(
@@ -10644,7 +10644,7 @@ var $author$project$ElmLogo$selectModel = function (model) {
 					$elm$html$Html$select,
 					_List_fromArray(
 						[
-							$elm$html$Html$Events$onInput($author$project$ElmLogo$SelectMesh),
+							$elm$html$Html$Events$onInput($author$project$ModelViewer$SelectMesh),
 							$elm$html$Html$Attributes$value(model.currentModel)
 						]),
 					A2(
@@ -10661,7 +10661,7 @@ var $author$project$ElmLogo$selectModel = function (model) {
 										$elm$html$Html$text(t)
 									]));
 						},
-						$author$project$ElmLogo$models))
+						$author$project$ModelViewer$models))
 				]),
 			A2($elm$core$String$startsWith, 'meshes/elmLogo', model.currentModel) ? _List_fromArray(
 				[
@@ -10671,7 +10671,7 @@ var $author$project$ElmLogo$selectModel = function (model) {
 					_List_fromArray(
 						[
 							$elm$html$Html$Attributes$type_('checkbox'),
-							$elm$html$Html$Events$onCheck($author$project$ElmLogo$SetUseTangent),
+							$elm$html$Html$Events$onCheck($author$project$ModelViewer$SetUseTangent),
 							$elm$html$Html$Attributes$checked(model.withTangent)
 						]),
 					_List_Nil)
@@ -10697,13 +10697,13 @@ var $elm$html$Html$Attributes$width = function (n) {
 		'width',
 		$elm$core$String$fromInt(n));
 };
-var $author$project$ElmLogo$view = function (model) {
+var $author$project$ModelViewer$view = function (model) {
 	return A2(
 		$elm$html$Html$div,
 		_List_Nil,
 		_List_fromArray(
 			[
-				$author$project$ElmLogo$selectModel(model),
+				$author$project$ModelViewer$selectModel(model),
 				function () {
 				var _v0 = _Utils_Tuple3(model.mesh, model.diffText, model.normText);
 				if (_v0.a.$ === 'Ok') {
@@ -10720,14 +10720,14 @@ var $author$project$ElmLogo$view = function (model) {
 								]),
 							_List_fromArray(
 								[
-									$author$project$ElmLogo$onZoom,
+									$author$project$ModelViewer$onZoom,
 									$elm$html$Html$Attributes$width(model.windowSize.width),
 									$elm$html$Html$Attributes$height(model.windowSize.height),
 									A2($elm$html$Html$Attributes$style, 'position', 'absolute')
 								]),
 							A2(
 								$elm$core$List$map,
-								A3($author$project$ElmLogo$renderModel, model, td, tn),
+								A3($author$project$ModelViewer$renderModel, model, td, tn),
 								A2(
 									$elm$core$List$concatMap,
 									$elm$core$Dict$values,
@@ -10754,18 +10754,18 @@ var $author$project$ElmLogo$view = function (model) {
 			}()
 			]));
 };
-var $author$project$ElmLogo$main = $elm$browser$Browser$element(
+var $author$project$ModelViewer$main = $elm$browser$Browser$element(
 	{
 		init: $elm$core$Basics$always(
-			_Utils_Tuple2($author$project$ElmLogo$initModel, $author$project$ElmLogo$initCmd)),
-		subscriptions: $author$project$ElmLogo$subscriptions,
-		update: $author$project$ElmLogo$update,
-		view: $author$project$ElmLogo$view
+			_Utils_Tuple2($author$project$ModelViewer$initModel, $author$project$ModelViewer$initCmd)),
+		subscriptions: $author$project$ModelViewer$subscriptions,
+		update: $author$project$ModelViewer$update,
+		view: $author$project$ModelViewer$view
 	});
-_Platform_export({'ElmLogo':{'init':$author$project$ElmLogo$main(
+_Platform_export({'ModelViewer':{'init':$author$project$ModelViewer$main(
 	$elm$json$Json$Decode$succeed(_Utils_Tuple0))(0)}});}(this));
 
-  var app = Elm.ElmLogo.init({ node: document.getElementById("elm") });
+  var app = Elm.ModelViewer.init({ node: document.getElementById("elm") });
 }
 catch (e)
 {
