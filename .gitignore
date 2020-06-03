@@ -3,5 +3,7 @@ node_modules/
 
 # Jetbrains
 .idea/
+examples/*.html
+*.log
 
 ~*
