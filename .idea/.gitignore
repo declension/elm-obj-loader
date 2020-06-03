@@ -1,0 +1,8 @@
+# Jetbrains
+.idea/
+
+*.tmp
+*.so
+
+# Elm
+elm-stuff
