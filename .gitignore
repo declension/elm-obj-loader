@@ -1,6 +1,6 @@
 elm-stuff/
-index.html
-src/Main.elm
-documentation.json
-# this is only for debugging
-src/Native/
+
+# Jetbrains
+.idea/
+
+~*
