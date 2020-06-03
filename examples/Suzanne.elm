@@ -140,7 +140,7 @@ view model =
     case ( model.mesh, model.reflectionTexture ) of
         ( Ok m, Ok t ) ->
             GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
-                [ onZoom, Attr.width 400, Attr.height 400 ]
+                [ onZoom, Attr.width model.width, Attr.height model.height ]
                 [ renderModel model t m ]
 
         ( Err meshErr, Err reflectionErr ) ->
