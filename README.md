@@ -1,7 +1,7 @@
 elm-obj-loader
 ==============
 
-[![CircleCI](https://circleci.com/gh/declension/elm-obj-loader.svg?style=svg)](https://circleci.com/gh/declension/elm-obj-loader)
+![Node.js CI](https://github.com/declension/elm-obj-loader/workflows/Node.js%20CI/badge.svg)
 
 This is an Elm library for importing simple [Wavefront `.obj`][objSpecs] files into your WebGL application.
 
@@ -35,7 +35,6 @@ Only a small subset of the specification is supported though - specifically:
 * No free-form curves / surfaces.    
 * No material library ([mtllib](http://people.sc.fsu.edu/~jburkardt/data/mtl/mtl.html)) support.   
 * No negative indexing.   
-
 
 
 [suzanne]: https://zinggi.github.io/randomDemos/webgl/objLoader_simple.html
