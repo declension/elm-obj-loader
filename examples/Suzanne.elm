@@ -1,7 +1,8 @@
 module Suzanne exposing (Model, Msg(..), getCamera, initCmd, initModel, loadTexture, main, onZoom, renderModel, update, view)
 
 import Browser
-import Browser.Events exposing (onAnimationFrameDelta)
+import Browser.Dom
+import Browser.Events exposing (onAnimationFrameDelta, onResize)
 import Html
 import Html.Attributes as Attr
 import Html.Events exposing (on)
@@ -24,7 +25,12 @@ main =
     Browser.element
         { init = always ( initModel, initCmd )
         , view = view
-        , subscriptions = always (onAnimationFrameDelta Tick)
+        , subscriptions =
+            always <|
+                Sub.batch
+                    [ onAnimationFrameDelta Tick
+                    , onResize ResizeWindow
+                    ]
         , update = update
         }
 
@@ -37,13 +43,15 @@ type alias Model =
     { time : Float
     , mesh : Result String (MeshWith VertexWithTexture)
     , zoom : Float
+    , width : Int
+    , height : Int
     , reflectionTexture : Result String Texture
     }
 
 
 initModel : Model
 initModel =
-    { mesh = Err "loading ...", time = 0, zoom = 10, reflectionTexture = Err "Loading texture..." }
+    { mesh = Err "loading ...", time = 0, width = 640, height = 640, zoom = 1.5, reflectionTexture = Err "Loading texture..." }
 
 
 initCmd : Cmd Msg
@@ -51,6 +59,11 @@ initCmd =
     Cmd.batch
         [ OBJ.loadMesh "meshes/suzanne.obj" LoadObj
         , loadTexture "textures/chavant.jpg" TextureLoaded
+        , Task.perform
+            (\{ viewport } ->
+                ResizeWindow (round viewport.width) (round viewport.height)
+            )
+            Browser.Dom.getViewport
         ]
 
 
@@ -62,6 +75,7 @@ type Msg
     = Tick Float
     | LoadObj (Result String (MeshWith VertexWithTexture))
     | Zoom Float
+    | ResizeWindow Int Int
     | TextureLoaded (Result String Texture)
 
 
@@ -72,7 +86,7 @@ update msg model =
             ( { model | time = model.time + dt / 1000 }, Cmd.none )
 
         Zoom dy ->
-            ( { model | zoom = model.zoom + dy / 100 }, Cmd.none )
+            ( { model | zoom = max 1 (model.zoom + dy / 15) }, Cmd.none )
 
         LoadObj mesh ->
             ( { model | mesh = mesh }, Cmd.none )
@@ -80,19 +94,25 @@ update msg model =
         TextureLoaded t ->
             ( { model | reflectionTexture = t }, Cmd.none )
 
+        ResizeWindow w h ->
+            ( { model | width = w, height = h }, Cmd.none )
+
 
 
 -- VIEW / RENDER
 
 
 renderModel : Model -> Texture -> MeshWith VertexWithTexture -> GL.Entity
-renderModel { zoom, time } texture { vertices, indices } =
+renderModel { zoom, time, width, height } texture { vertices, indices } =
     let
+        aspect =
+            toFloat width / toFloat height
+
         ( camera, view_ ) =
-            getCamera zoom time
+            getCamera aspect zoom time
 
         model =
-            M4.makeRotate time (vec3 0 1 0)
+            M4.makeRotate (0.6 * time) (vec3 0 1 0)
 
         modelView =
             M4.mul view_ model
@@ -104,10 +124,14 @@ renderModel { zoom, time } texture { vertices, indices } =
         { camera = camera, mvMat = modelView, texture = texture }
 
 
-getCamera : Float -> Float -> ( Mat4, Mat4 )
-getCamera zoom t =
-    ( M4.makePerspective 45 1 0.01 10000
-    , M4.makeLookAt (vec3 zoom (zoom / 2) zoom) (vec3 0 0 0) (vec3 0 1 0)
+getCamera : Float -> Float -> Float -> ( Mat4, Mat4 )
+getCamera aspect zoom _ =
+    let
+        pos =
+            0.5 + zoom * zoom
+    in
+    ( M4.makePerspective 45 aspect 0.01 10000
+    , M4.makeLookAt (vec3 pos (pos / 2) pos) (vec3 0 0 0) (vec3 0 1 0)
     )
 
 

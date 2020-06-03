@@ -3,7 +3,7 @@
     "name": "declension/elm-obj-loader",
     "summary": "Load Wavefront .obj files in your WebGL scene.",
     "license": "MIT",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "exposed-modules": [
         "OBJ",
         "OBJ.Types"

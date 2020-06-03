@@ -1,10 +1,11 @@
 module ModelViewer exposing (CameraInfo, Model, Msg(..), Size, decodeMouse, getCamera, getDelta, initCmd, initModel, loadModel, loadTexture, main, models, onZoom, renderCullFace, renderModel, selectModel, subscriptions, update, view)
 
-import Browser
+import Browser exposing (Document)
+import Browser.Dom
 import Browser.Events exposing (onAnimationFrameDelta, onMouseDown, onMouseMove, onMouseUp, onResize)
 import Dict exposing (Dict)
-import Html exposing (Html, div, text)
-import Html.Attributes as Attr
+import Html exposing (Html, div, main_, text)
+import Html.Attributes as Attr exposing (style)
 import Html.Events exposing (on, onCheck, onInput)
 import Json.Decode as JD exposing (int)
 import Math.Matrix4 as M4 exposing (Mat4)
@@ -15,7 +16,6 @@ import OBJ.Types exposing (Mesh(..), ObjFile)
 import Shaders
 import String exposing (fromInt)
 import Task
-import Time exposing (Posix(..), posixToMillis)
 import WebGL as GL
 import WebGL.Settings exposing (cullFace, front)
 import WebGL.Settings.DepthTest as DepthTest
@@ -24,7 +24,7 @@ import WebGL.Texture exposing (Error(..), Texture)
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.document
         { init = always ( initModel, initCmd )
         , view = view
         , subscriptions = subscriptions
@@ -56,13 +56,13 @@ initModel =
     { mesh = Err "loading ..."
     , currentModel = "meshes/elmLogo.obj"
     , time = 0
-    , zoom = 5
+    , zoom = 3.5
     , diffText = Err "Loading texture..."
     , normText = Err "Loading texture..."
     , isDown = False
     , lastMousePos = vec2 0 0
     , mouseDelta = vec2 0 (pi / 2)
-    , windowSize = Size 800 600
+    , windowSize = Size 0 0
     , withTangent = True
     }
 
@@ -80,6 +80,11 @@ initCmd =
         [ loadModel True "meshes/elmLogo.obj"
         , loadTexture "textures/elmLogoDiffuse.png" DiffTextureLoaded
         , loadTexture "textures/elmLogoNorm.png" NormTextureLoaded
+        , Task.perform
+            (\{ viewport } ->
+                ResizeWindow (round viewport.width) (round viewport.height)
+            )
+            Browser.Dom.getViewport
         ]
 
 
@@ -121,7 +126,7 @@ update msg model =
             ( { model | time = model.time + dt / 1000 }, Cmd.none )
 
         Zoom dy ->
-            ( { model | zoom = max 0.01 (model.zoom + dy / 100) }, Cmd.none )
+            ( { model | zoom = max 1 (model.zoom + dy / 10) }, Cmd.none )
 
         SelectMesh url ->
             ( model, loadModel model.withTangent url )
@@ -169,7 +174,7 @@ renderModel model textureDiff textureNorm mesh =
             M4.makeTranslate (vec3 -1 0 0)
 
         theta =
-            2 * model.time
+            -1.75 * model.time
 
         lightPos =
             vec3 (0.5 * cos theta) (1 + 0.5 * sin theta) 0.5
@@ -217,29 +222,33 @@ getCamera { mouseDelta, zoom, windowSize } =
     { projection = proj, view = view_, viewProjection = M4.mul proj view_, position = position }
 
 
-view : Model -> Html.Html Msg
+view : Model -> Document Msg
 view model =
-    div []
-        [ selectModel model
-        , case ( model.mesh, model.diffText, model.normText ) of
-            ( Ok m, Ok td, Ok tn ) ->
-                GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
-                    [ onZoom
-                    , Attr.width model.windowSize.width
-                    , Attr.height model.windowSize.height
-                    , Attr.style "position" "absolute"
-                    ]
-                    (Dict.values m
-                        |> List.concatMap Dict.values
-                        |> List.map (renderModel model td tn)
-                    )
+    { title = "OBJ Model Viewer - elm-obj-loader"
+    , body =
+        [ main_ [ style "width" "100vw", style "height" "100vh" ]
+            [ selectModel model
+            , case ( model.mesh, model.diffText, model.normText ) of
+                ( Ok m, Ok td, Ok tn ) ->
+                    GL.toHtmlWith [ GL.antialias, GL.depth 1 ]
+                        [ onZoom
+                        , Attr.width model.windowSize.width
+                        , Attr.height model.windowSize.height
+                        , Attr.style "position" "absolute"
+                        ]
+                        (Dict.values m
+                            |> List.concatMap Dict.values
+                            |> List.map (renderModel model td tn)
+                        )
 
-            ( Err m, _, _ ) ->
-                Html.div [] [ Html.text <| "ERROR with mesh: " ++ m ]
+                ( Err m, _, _ ) ->
+                    Html.div [] [ Html.text <| "ERROR with mesh: " ++ m ]
 
-            _ ->
-                Html.div [] [ Html.text <| "Non-mesh error." ]
+                _ ->
+                    Html.div [] [ Html.text <| "Non-mesh error." ]
+            ]
         ]
+    }
 
 
 selectModel : Model -> Html Msg
