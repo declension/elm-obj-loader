@@ -7154,14 +7154,19 @@ var $elm$core$Task$perform = F2(
 			$elm$core$Task$Perform(
 				A2($elm$core$Task$map, toMessage, task)));
 	});
-var $elm$browser$Browser$element = _Browser_element;
+var $elm$browser$Browser$document = _Browser_document;
 var $author$project$ModelViewer$DiffTextureLoaded = function (a) {
 	return {$: 'DiffTextureLoaded', a: a};
 };
 var $author$project$ModelViewer$NormTextureLoaded = function (a) {
 	return {$: 'NormTextureLoaded', a: a};
 };
+var $author$project$ModelViewer$ResizeWindow = F2(
+	function (a, b) {
+		return {$: 'ResizeWindow', a: a, b: b};
+	});
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
+var $elm$browser$Browser$Dom$getViewport = _Browser_withWindow(_Browser_getViewport);
 var $author$project$ModelViewer$LoadObj = F2(
 	function (a, b) {
 		return {$: 'LoadObj', a: a, b: b};
@@ -9673,12 +9678,23 @@ var $author$project$ModelViewer$loadTexture = F2(
 			},
 			$elm_explorations$webgl$WebGL$Texture$load(url));
 	});
+var $elm$core$Basics$round = _Basics_round;
 var $author$project$ModelViewer$initCmd = $elm$core$Platform$Cmd$batch(
 	_List_fromArray(
 		[
 			A2($author$project$ModelViewer$loadModel, true, 'meshes/elmLogo.obj'),
 			A2($author$project$ModelViewer$loadTexture, 'textures/elmLogoDiffuse.png', $author$project$ModelViewer$DiffTextureLoaded),
-			A2($author$project$ModelViewer$loadTexture, 'textures/elmLogoNorm.png', $author$project$ModelViewer$NormTextureLoaded)
+			A2($author$project$ModelViewer$loadTexture, 'textures/elmLogoNorm.png', $author$project$ModelViewer$NormTextureLoaded),
+			A2(
+			$elm$core$Task$perform,
+			function (_v0) {
+				var viewport = _v0.viewport;
+				return A2(
+					$author$project$ModelViewer$ResizeWindow,
+					$elm$core$Basics$round(viewport.width),
+					$elm$core$Basics$round(viewport.height));
+			},
+			$elm$browser$Browser$Dom$getViewport)
 		]));
 var $author$project$ModelViewer$Size = F2(
 	function (width, height) {
@@ -9694,9 +9710,9 @@ var $author$project$ModelViewer$initModel = {
 	mouseDelta: A2($elm_explorations$linear_algebra$Math$Vector2$vec2, 0, $elm$core$Basics$pi / 2),
 	normText: $elm$core$Result$Err('Loading texture...'),
 	time: 0,
-	windowSize: A2($author$project$ModelViewer$Size, 800, 600),
+	windowSize: A2($author$project$ModelViewer$Size, 0, 0),
 	withTangent: true,
-	zoom: 5
+	zoom: 3.5
 };
 var $author$project$ModelViewer$MouseDown = F2(
 	function (a, b) {
@@ -9707,10 +9723,6 @@ var $author$project$ModelViewer$MouseMove = F2(
 		return {$: 'MouseMove', a: a, b: b};
 	});
 var $author$project$ModelViewer$MouseUp = {$: 'MouseUp'};
-var $author$project$ModelViewer$ResizeWindow = F2(
-	function (a, b) {
-		return {$: 'ResizeWindow', a: a, b: b};
-	});
 var $author$project$ModelViewer$Tick = function (a) {
 	return {$: 'Tick', a: a};
 };
@@ -10210,7 +10222,7 @@ var $author$project$ModelViewer$update = F2(
 					_Utils_update(
 						model,
 						{
-							zoom: A2($elm$core$Basics$max, 0.01, model.zoom + (dy / 100))
+							zoom: A2($elm$core$Basics$max, 1, model.zoom + (dy / 10))
 						}),
 					$elm$core$Platform$Cmd$none);
 			case 'SelectMesh':
@@ -10317,6 +10329,7 @@ var $elm$html$Html$Attributes$height = function (n) {
 		'height',
 		$elm$core$String$fromInt(n));
 };
+var $elm$html$Html$main_ = _VirtualDom_node('main');
 var $author$project$ModelViewer$Zoom = function (a) {
 	return {$: 'Zoom', a: a};
 };
@@ -10501,7 +10514,7 @@ var $author$project$Shaders$simpleVert = {
 };
 var $author$project$ModelViewer$renderModel = F4(
 	function (model, textureDiff, textureNorm, mesh) {
-		var theta = 2 * model.time;
+		var theta = (-1.75) * model.time;
 		var modelM = $elm_explorations$linear_algebra$Math$Matrix4$makeTranslate(
 			A3($elm_explorations$linear_algebra$Math$Vector3$vec3, -1, 0, 0));
 		var lightPos = A3(
@@ -10698,63 +10711,73 @@ var $elm$html$Html$Attributes$width = function (n) {
 		$elm$core$String$fromInt(n));
 };
 var $author$project$ModelViewer$view = function (model) {
-	return A2(
-		$elm$html$Html$div,
-		_List_Nil,
-		_List_fromArray(
+	return {
+		body: _List_fromArray(
 			[
-				$author$project$ModelViewer$selectModel(model),
-				function () {
-				var _v0 = _Utils_Tuple3(model.mesh, model.diffText, model.normText);
-				if (_v0.a.$ === 'Ok') {
-					if ((_v0.b.$ === 'Ok') && (_v0.c.$ === 'Ok')) {
-						var m = _v0.a.a;
-						var td = _v0.b.a;
-						var tn = _v0.c.a;
-						return A3(
-							$elm_explorations$webgl$WebGL$toHtmlWith,
-							_List_fromArray(
-								[
-									$elm_explorations$webgl$WebGL$antialias,
-									$elm_explorations$webgl$WebGL$depth(1)
-								]),
-							_List_fromArray(
-								[
-									$author$project$ModelViewer$onZoom,
-									$elm$html$Html$Attributes$width(model.windowSize.width),
-									$elm$html$Html$Attributes$height(model.windowSize.height),
-									A2($elm$html$Html$Attributes$style, 'position', 'absolute')
-								]),
-							A2(
-								$elm$core$List$map,
-								A3($author$project$ModelViewer$renderModel, model, td, tn),
-								A2(
-									$elm$core$List$concatMap,
-									$elm$core$Dict$values,
-									$elm$core$Dict$values(m))));
-					} else {
-						return A2(
-							$elm$html$Html$div,
-							_List_Nil,
-							_List_fromArray(
-								[
-									$elm$html$Html$text('Non-mesh error.')
-								]));
-					}
-				} else {
-					var m = _v0.a.a;
-					return A2(
-						$elm$html$Html$div,
-						_List_Nil,
-						_List_fromArray(
-							[
-								$elm$html$Html$text('ERROR with mesh: ' + m)
-							]));
-				}
-			}()
-			]));
+				A2(
+				$elm$html$Html$main_,
+				_List_fromArray(
+					[
+						A2($elm$html$Html$Attributes$style, 'width', '100vw'),
+						A2($elm$html$Html$Attributes$style, 'height', '100vh')
+					]),
+				_List_fromArray(
+					[
+						$author$project$ModelViewer$selectModel(model),
+						function () {
+						var _v0 = _Utils_Tuple3(model.mesh, model.diffText, model.normText);
+						if (_v0.a.$ === 'Ok') {
+							if ((_v0.b.$ === 'Ok') && (_v0.c.$ === 'Ok')) {
+								var m = _v0.a.a;
+								var td = _v0.b.a;
+								var tn = _v0.c.a;
+								return A3(
+									$elm_explorations$webgl$WebGL$toHtmlWith,
+									_List_fromArray(
+										[
+											$elm_explorations$webgl$WebGL$antialias,
+											$elm_explorations$webgl$WebGL$depth(1)
+										]),
+									_List_fromArray(
+										[
+											$author$project$ModelViewer$onZoom,
+											$elm$html$Html$Attributes$width(model.windowSize.width),
+											$elm$html$Html$Attributes$height(model.windowSize.height),
+											A2($elm$html$Html$Attributes$style, 'position', 'absolute')
+										]),
+									A2(
+										$elm$core$List$map,
+										A3($author$project$ModelViewer$renderModel, model, td, tn),
+										A2(
+											$elm$core$List$concatMap,
+											$elm$core$Dict$values,
+											$elm$core$Dict$values(m))));
+							} else {
+								return A2(
+									$elm$html$Html$div,
+									_List_Nil,
+									_List_fromArray(
+										[
+											$elm$html$Html$text('Non-mesh error.')
+										]));
+							}
+						} else {
+							var m = _v0.a.a;
+							return A2(
+								$elm$html$Html$div,
+								_List_Nil,
+								_List_fromArray(
+									[
+										$elm$html$Html$text('ERROR with mesh: ' + m)
+									]));
+						}
+					}()
+					]))
+			]),
+		title: 'OBJ Model Viewer - elm-obj-loader'
+	};
 };
-var $author$project$ModelViewer$main = $elm$browser$Browser$element(
+var $author$project$ModelViewer$main = $elm$browser$Browser$document(
 	{
 		init: $elm$core$Basics$always(
 			_Utils_Tuple2($author$project$ModelViewer$initModel, $author$project$ModelViewer$initCmd)),
