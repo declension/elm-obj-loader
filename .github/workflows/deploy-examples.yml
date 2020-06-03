@@ -6,8 +6,6 @@ name: Deploy examples
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 jobs:
   build:
@@ -26,7 +24,7 @@ jobs:
       run: npm install
 
     - name: Build Examples
-      run: cd examples; elm make Shaders.e
+      run: npm build-examples
 
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
