@@ -177,7 +177,7 @@ renderModel model textureDiff textureNorm mesh =
             -1.75 * model.time
 
         lightPos =
-            vec3 (0.5 * cos theta) (1 + 0.5 * sin theta) 0.5
+            vec3 (1.75 * cos theta) (1 + 1.75 * sin theta) 2.5
 
         uniforms =
             { camera = camera
@@ -187,6 +187,7 @@ renderModel model textureDiff textureNorm mesh =
             , viewPosition = camera.position
             , textureDiff = textureDiff
             , textureNorm = textureNorm
+            , diffuseColor = vec3 0.7 0.4 0.2
             , lightPosition = lightPos
             }
     in

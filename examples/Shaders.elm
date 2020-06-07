@@ -132,7 +132,7 @@ void main() {
     vec3 ambient = 0.3 * diffuseColor;
 
     // specular
-    float shininess = 32.0;
+    float shininess = 64.0;
     vec3 viewDir = normalize(vViewDirection);
     vec3 reflectDir = reflect(-lightDir, pixelNormal);
     vec3 halfwayDir = normalize(lightDir + viewDir);
@@ -140,7 +140,7 @@ void main() {
     vec3 specular = vec3(0.2) * spec * lightIntensities;
 
     // attenuation
-    float lightAttenuation = 0.3;
+    float lightAttenuation = 0.15;
     float attenuation = 1.0 / (1.0 + lightAttenuation * pow(length(vLightDirection), 2.0));
 
     vec3 final_color = ambient + (diffuse + specular) * attenuation;
@@ -210,7 +210,7 @@ void main()
     vec3 ambient = 0.3 * diffuseColor;
 
     // specular
-    float shininess = 32.0;
+    float shininess = 64.0;
     vec3 viewDir = normalize(vViewDirection);
     vec3 reflectDir = reflect(-lightDir, pixelNormal);
     vec3 halfwayDir = normalize(lightDir + viewDir);
@@ -218,7 +218,7 @@ void main()
     vec3 specular = vec3(0.2) * spec * lightIntensities;
 
     // attenuation
-    float lightAttenuation = 0.3;
+    float lightAttenuation = 0.15;
     float attenuation = 1.0 / (1.0 + lightAttenuation * pow(length(vLightDirection), 2.0));
 
     vec3 final_color = ambient + (diffuse + specular) * attenuation;
@@ -267,6 +267,8 @@ varying vec3 vLightDirection;
 varying vec3 vViewDirection;
 varying vec3 vNormal;
 
+uniform vec3 diffuseColor;
+
 void main()
 {
     vec3 lightDir = normalize(vLightDirection);
@@ -277,14 +279,13 @@ void main()
 
     // diffuse + lambert
     vec3 lightIntensities = vec3(1.5, 1.0, 1.0);
-    vec3 diffuseColor = vec3(0.3, 0.2, 0.95);
     vec3 diffuse = lambert * diffuseColor * lightIntensities;
 
     // ambient
     vec3 ambient = 0.2 * diffuseColor;
 
     // specular
-    float shininess = 32.0;
+    float shininess = 64.0;
     vec3 viewDir = normalize(vViewDirection);
     vec3 reflectDir = reflect(-lightDir, pixelNormal);
     vec3 halfwayDir = normalize(lightDir + viewDir);
@@ -292,7 +293,7 @@ void main()
     vec3 specular = vec3(0.2) * spec * lightIntensities;
 
     // attenuation
-    float lightAttenuation = 0.3;
+    float lightAttenuation = 0.15;
     float attenuation = 1.0 / (1.0 + lightAttenuation * pow(length(vLightDirection), 2.0));
 
     vec3 final_color = ambient + (diffuse + specular) * attenuation;
