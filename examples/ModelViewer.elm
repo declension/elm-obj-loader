@@ -242,10 +242,10 @@ view model =
                         )
 
                 ( Err m, _, _ ) ->
-                    Html.div [] [ Html.text <| "ERROR with mesh: " ++ m ]
+                    Html.pre [] [ Html.text <| "ERROR with mesh: " ++ m ]
 
                 _ ->
-                    Html.div [] [ Html.text <| "Non-mesh error." ]
+                    Html.pre [] [ Html.text <| "Non-mesh error." ]
             ]
         ]
     }
@@ -312,19 +312,19 @@ getDelta curr lastP delta =
 
 
 loadTexture : String -> (Result String Texture -> msg) -> Cmd msg
-loadTexture url msg =
+loadTexture url toMsg =
     WebGL.Texture.load url
         |> Task.attempt
             (\r ->
                 case r of
                     Ok t ->
-                        msg (Ok t)
+                        toMsg (Ok t)
 
                     Err LoadError ->
-                        msg (Err "Failed to load texture")
+                        toMsg (Err "Failed to load texture")
 
                     Err (SizeError w h) ->
-                        msg (Err ("Invalid texture size: " ++ fromInt w ++ " x " ++ fromInt h))
+                        toMsg (Err ("Invalid texture size: " ++ fromInt w ++ " x " ++ fromInt h))
             )
 
 
