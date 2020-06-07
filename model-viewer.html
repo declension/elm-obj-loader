@@ -9653,24 +9653,24 @@ var $elm_explorations$webgl$WebGL$Texture$loadWith = F2(
 	});
 var $elm_explorations$webgl$WebGL$Texture$load = $elm_explorations$webgl$WebGL$Texture$loadWith($elm_explorations$webgl$WebGL$Texture$defaultOptions);
 var $author$project$ModelViewer$loadTexture = F2(
-	function (url, msg) {
+	function (url, toMsg) {
 		return A2(
 			$elm$core$Task$attempt,
 			function (r) {
 				if (r.$ === 'Ok') {
 					var t = r.a;
-					return msg(
+					return toMsg(
 						$elm$core$Result$Ok(t));
 				} else {
 					if (r.a.$ === 'LoadError') {
 						var _v1 = r.a;
-						return msg(
+						return toMsg(
 							$elm$core$Result$Err('Failed to load texture'));
 					} else {
 						var _v2 = r.a;
 						var w = _v2.a;
 						var h = _v2.b;
-						return msg(
+						return toMsg(
 							$elm$core$Result$Err(
 								'Invalid texture size: ' + ($elm$core$String$fromInt(w) + (' x ' + $elm$core$String$fromInt(h)))));
 					}
@@ -10322,7 +10322,6 @@ var $elm_explorations$webgl$WebGL$Internal$Depth = function (a) {
 	return {$: 'Depth', a: a};
 };
 var $elm_explorations$webgl$WebGL$depth = $elm_explorations$webgl$WebGL$Internal$Depth;
-var $elm$html$Html$div = _VirtualDom_node('div');
 var $elm$html$Html$Attributes$height = function (n) {
 	return A2(
 		_VirtualDom_attribute,
@@ -10351,6 +10350,7 @@ var $author$project$ModelViewer$onZoom = A2(
 		$elm$json$Json$Decode$map,
 		$author$project$ModelViewer$Zoom,
 		A2($elm$json$Json$Decode$field, 'deltaY', $elm$json$Json$Decode$float)));
+var $elm$html$Html$pre = _VirtualDom_node('pre');
 var $elm$core$Basics$cos = _Basics_cos;
 var $elm_explorations$linear_algebra$Math$Matrix4$makeLookAt = _MJS_m4x4makeLookAt;
 var $elm_explorations$linear_algebra$Math$Matrix4$makePerspective = _MJS_m4x4makePerspective;
@@ -10578,6 +10578,7 @@ var $elm$html$Html$Attributes$boolProperty = F2(
 			$elm$json$Json$Encode$bool(bool));
 	});
 var $elm$html$Html$Attributes$checked = $elm$html$Html$Attributes$boolProperty('checked');
+var $elm$html$Html$div = _VirtualDom_node('div');
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $author$project$ModelViewer$models = _List_fromArray(
 	['meshes/elmLogo.obj', 'meshes/suzanneNoUV.obj']);
@@ -10754,7 +10755,7 @@ var $author$project$ModelViewer$view = function (model) {
 											$elm$core$Dict$values(m))));
 							} else {
 								return A2(
-									$elm$html$Html$div,
+									$elm$html$Html$pre,
 									_List_Nil,
 									_List_fromArray(
 										[
@@ -10764,7 +10765,7 @@ var $author$project$ModelViewer$view = function (model) {
 						} else {
 							var m = _v0.a.a;
 							return A2(
-								$elm$html$Html$div,
+								$elm$html$Html$pre,
 								_List_Nil,
 								_List_fromArray(
 									[
