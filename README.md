@@ -1,3 +1,7 @@
+⚠️ **This repo is now deprecated, in favour of the excellent [elm-obj-file](https://github.com/w0rm/elm-obj-file) which works well with [Elm 3D Scene](https://package.elm-lang.org/packages/ianmackenzie/elm-3d-scene/latest)**
+
+----
+
 elm-obj-loader
 ==============
 
